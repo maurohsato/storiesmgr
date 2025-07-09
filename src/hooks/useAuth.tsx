@@ -270,7 +270,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw error;
     }
   };
-  };
 
   const signOut = async () => {
     await auth.signOut();
