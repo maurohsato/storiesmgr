@@ -1,6 +1,5 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase, auth } from '../lib/supabase';
 import { Database } from '../types/database';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -30,73 +29,151 @@ export const useAuth = () => {
   return context;
 };
 
+// Demo users for local development
+const DEMO_USERS = [
+  {
+    id: '1',
+    email: 'admin@demo.com',
+    password: 'demo123',
+    profile: {
+      id: '1',
+      email: 'admin@demo.com',
+      full_name: 'Administrador Demo',
+      role: 'admin' as const,
+      avatar_url: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  },
+  {
+    id: '2',
+    email: 'manager@demo.com',
+    password: 'demo123',
+    profile: {
+      id: '2',
+      email: 'manager@demo.com',
+      full_name: 'Gerente Demo',
+      role: 'project_manager' as const,
+      avatar_url: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  },
+  {
+    id: '3',
+    email: 'collab@demo.com',
+    password: 'demo123',
+    profile: {
+      id: '3',
+      email: 'collab@demo.com',
+      full_name: 'Colaborador Demo',
+      role: 'collaborator' as const,
+      avatar_url: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  },
+  {
+    id: '4',
+    email: 'reader@demo.com',
+    password: 'demo123',
+    profile: {
+      id: '4',
+      email: 'reader@demo.com',
+      full_name: 'Leitor Demo',
+      role: 'reader' as const,
+      avatar_url: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  }
+];
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+    // Check for existing session in localStorage
+    const checkExistingSession = () => {
+      const savedUser = localStorage.getItem('demo_user');
+      const savedProfile = localStorage.getItem('demo_profile');
       
-      if (session?.user) {
-        const userProfile = await auth.getCurrentProfile();
-        setProfile(userProfile);
+      if (savedUser && savedProfile) {
+        setUser(JSON.parse(savedUser));
+        setProfile(JSON.parse(savedProfile));
       }
       
       setLoading(false);
     };
 
-    getInitialSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          const userProfile = await auth.getCurrentProfile();
-          setProfile(userProfile);
-        } else {
-          setProfile(null);
-        }
-        
-        setLoading(false);
-      }
-    );
-
-    return () => subscription.unsubscribe();
+    checkExistingSession();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await auth.signIn(email, password);
-    if (error) throw error;
+    const demoUser = DEMO_USERS.find(u => u.email === email && u.password === password);
+    
+    if (!demoUser) {
+      throw new Error('Credenciais inválidas. Use uma das contas de demonstração.');
+    }
+
+    const mockUser = {
+      id: demoUser.id,
+      email: demoUser.email,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as User;
+
+    setUser(mockUser);
+    setProfile(demoUser.profile);
+    
+    // Save to localStorage
+    localStorage.setItem('demo_user', JSON.stringify(mockUser));
+    localStorage.setItem('demo_profile', JSON.stringify(demoUser.profile));
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await auth.signUp(email, password, fullName);
-    if (error) throw error;
+    // For demo purposes, just create a new reader user
+    const newId = Date.now().toString();
+    const mockUser = {
+      id: newId,
+      email,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as User;
+
+    const newProfile: Profile = {
+      id: newId,
+      email,
+      full_name: fullName,
+      role: 'reader',
+      avatar_url: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setUser(mockUser);
+    setProfile(newProfile);
+    
+    // Save to localStorage
+    localStorage.setItem('demo_user', JSON.stringify(mockUser));
+    localStorage.setItem('demo_profile', JSON.stringify(newProfile));
   };
 
   const signOut = async () => {
-    const { error } = await auth.signOut();
-    if (error) throw error;
+    setUser(null);
+    setProfile(null);
+    localStorage.removeItem('demo_user');
+    localStorage.removeItem('demo_profile');
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
-    if (!user) throw new Error('No user logged in');
+    if (!profile) throw new Error('No user logged in');
     
-    const updatedProfile = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single();
-    
-    if (updatedProfile.error) throw updatedProfile.error;
-    setProfile(updatedProfile.data);
+    const updatedProfile = { ...profile, ...updates };
+    setProfile(updatedProfile);
+    localStorage.setItem('demo_profile', JSON.stringify(updatedProfile));
   };
 
   // Permission helpers

@@ -22,7 +22,46 @@ const UserManagement: React.FC = () => {
 
   const loadProfiles = async () => {
     try {
-      const data = await db.getProfiles();
+      // For demo purposes, return mock profiles
+      const mockProfiles: Profile[] = [
+        {
+          id: '1',
+          email: 'admin@demo.com',
+          full_name: 'Administrador Demo',
+          role: 'admin',
+          avatar_url: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: '2',
+          email: 'manager@demo.com',
+          full_name: 'Gerente Demo',
+          role: 'project_manager',
+          avatar_url: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: '3',
+          email: 'collab@demo.com',
+          full_name: 'Colaborador Demo',
+          role: 'collaborator',
+          avatar_url: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: '4',
+          email: 'reader@demo.com',
+          full_name: 'Leitor Demo',
+          role: 'reader',
+          avatar_url: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+      ];
+      const data = mockProfiles;
       setProfiles(data);
     } catch (error) {
       console.error('Error loading profiles:', error);
@@ -44,11 +83,13 @@ const UserManagement: React.FC = () => {
 
     setUpdating(true);
     try {
-      await db.updateProfile(userId, { role: newRole });
+      // For demo purposes, just update local state
+      // await db.updateProfile(userId, { role: newRole });
       setProfiles(prev => prev.map(p => 
         p.id === userId ? { ...p, role: newRole } : p
       ));
       setEditingUser(null);
+      alert('Role atualizado com sucesso! (Modo demonstração)');
     } catch (error) {
       console.error('Error updating role:', error);
       alert('Erro ao atualizar role do usuário');
