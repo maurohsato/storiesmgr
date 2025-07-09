@@ -79,55 +79,59 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </div>
             
-            {/* Mobile menu button */}
-            <div className="sm:hidden flex items-center">
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-orange-700 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-orange-500"
-              >
-                {isMobileMenuOpen ? (
-                  <X className="block h-6 w-6" />
-                ) : (
-                  <Menu className="block h-6 w-6" />
-                )}
-              </button>
+            <div className="flex items-center">
+              {/* User Menu - Desktop */}
+              <div className="hidden sm:flex sm:items-center">
+                <UserMenu />
+              </div>
+              
+              {/* Mobile menu button */}
+              <div className="sm:hidden flex items-center ml-2">
+                <button
+                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                  className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-orange-700 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-orange-500"
+                >
+                  {isMobileMenuOpen ? (
+                    <X className="block h-6 w-6" />
+                  ) : (
+                    <Menu className="block h-6 w-6" />
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
-          
-          {/* User Menu */}
-          <div className="hidden sm:flex sm:items-center">
-            <UserMenu />
           </div>
           
           {/* Mobile menu */}
           {isMobileMenuOpen && (
-            <div className="mr-2">
-              <UserMenu />
-            </div>
-            <div className="sm:hidden">
-              <div className="pt-2 pb-3 space-y-1">
-                {navigation.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium transition-colors ${
-                        isActive(item.href)
-                          ? 'bg-orange-50 border-orange-500 text-orange-900'
-                          : 'border-transparent text-gray-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700'
-                      }`}
-                    >
-                      <div className="flex items-center">
-                        <Icon className="h-5 w-5 mr-3 text-orange-600" />
-                        {item.name}
-                      </div>
-                    </Link>
-                  );
-                })}
+            <>
+              <div className="mr-2 sm:hidden">
+                <UserMenu />
               </div>
-            </div>
+              <div className="sm:hidden">
+                <div className="pt-2 pb-3 space-y-1">
+                  {navigation.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.name}
+                        to={item.href}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium transition-colors ${
+                          isActive(item.href)
+                            ? 'bg-orange-50 border-orange-500 text-orange-900'
+                            : 'border-transparent text-gray-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700'
+                        }`}
+                      >
+                        <div className="flex items-center">
+                          <Icon className="h-5 w-5 mr-3 text-orange-600" />
+                          {item.name}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </nav>
