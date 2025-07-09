@@ -1,7 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Users, Building2, FolderOpen, FileText, Menu, X } from 'lucide-react';
+import { Home, Users, Building2, FolderOpen, FileText, Menu, X, UserCog } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import UserMenu from './auth/UserMenu';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,14 +11,28 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const { canManageUsers, canManageContent } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const navigation = [
+  const baseNavigation = [
     { name: 'Dashboard', href: '/', icon: Home },
-    { name: 'Times', href: '/teams', icon: Users },
-    { name: 'Clientes', href: '/clients', icon: Building2 },
-    { name: 'Projetos', href: '/projects', icon: FolderOpen },
     { name: 'Histórias', href: '/stories', icon: FileText },
+  ];
+  
+  const managementNavigation = [
+    { name: 'Times', href: '/teams', icon: Users, requiresManagement: true },
+    { name: 'Clientes', href: '/clients', icon: Building2, requiresManagement: true },
+    { name: 'Projetos', href: '/projects', icon: FolderOpen, requiresManagement: true },
+  ];
+  
+  const adminNavigation = [
+    { name: 'Usuários', href: '/users', icon: UserCog, requiresAdmin: true },
+  ];
+
+  const navigation = [
+    ...baseNavigation,
+    ...(canManageContent() ? managementNavigation : []),
+    ...(canManageUsers() ? adminNavigation : []),
   ];
 
   const isActive = (path: string) => {
@@ -78,8 +94,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           </div>
           
+          {/* User Menu */}
+          <div className="hidden sm:flex sm:items-center">
+            <UserMenu />
+          </div>
+          
           {/* Mobile menu */}
           {isMobileMenuOpen && (
+            <div className="mr-2">
+              <UserMenu />
+            </div>
             <div className="sm:hidden">
               <div className="pt-2 pb-3 space-y-1">
                 {navigation.map((item) => {
