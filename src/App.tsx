@@ -17,6 +17,7 @@ import ProjectDetail from './pages/ProjectDetail';
 import Stories from './pages/Stories';
 import UserStoryForm from './components/UserStoryForm';
 import UserManagement from './pages/UserManagement';
+import SupabaseValidation from './pages/SupabaseValidation';
 
 const AuthenticatedApp: React.FC = () => {
   const { user, loading } = useAuth();
@@ -52,6 +53,16 @@ const AuthenticatedApp: React.FC = () => {
           element={
             <AuthGuard requiredRoles="admin">
               <UserManagement />
+            </AuthGuard>
+          } 
+        />
+        
+        {/* Supabase Validation - Admin only */}
+        <Route 
+          path="/supabase-validation" 
+          element={
+            <AuthGuard requiredRoles="admin">
+              <SupabaseValidation />
             </AuthGuard>
           } 
         />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Users, Building2, FolderOpen, FileText, Menu, X, UserCog } from 'lucide-react';
+import { Home, Users, Building2, FolderOpen, FileText, Menu, X, UserCog, Database } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import UserMenu from './auth/UserMenu';
@@ -27,6 +27,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   
   const adminNavigation = [
     { name: 'Usuários', href: '/users', icon: UserCog, requiresAdmin: true },
+    { name: 'Validar Supabase', href: '/supabase-validation', icon: Database, requiresAdmin: true },
   ];
 
   const navigation = [
