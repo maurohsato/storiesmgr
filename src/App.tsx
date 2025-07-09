@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth.tsx';
+import { AppProvider } from './context/AppContext';
 import Layout from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
@@ -167,9 +168,11 @@ const AuthenticatedApp: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AuthenticatedApp />
-      </Router>
+      <AppProvider>
+        <Router>
+          <AuthenticatedApp />
+        </Router>
+      </AppProvider>
     </AuthProvider>
   );
 }
