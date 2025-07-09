@@ -202,6 +202,37 @@ const UserStoryForm: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+  const handleSendToBacklog = async () => {
+    if (!formData.projectId) {
+      alert('Por favor, selecione um projeto antes de enviar para o backlog.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      if (isEditing && id) {
+        await updateUserStory(id, formData);
+      } else {
+        await createUserStory(formData);
+      }
+      
+      setIsSubmitting(false);
+      if (!isEditing) {
+        localStorage.removeItem('userStoryForm');
+      }
+      // Navigate back to project detail if we came from there
+      if (projectId && !isEditing) {
+        navigate(`/projects/${projectId}`);
+      } else {
+        navigate('/stories');
+      }
+    } catch (error) {
+      console.error('Error saving story:', error);
+      alert('Erro ao salvar história. Tente novamente.');
+      setIsSubmitting(false);
+    }
+  };
 
   const sections = [
     {
