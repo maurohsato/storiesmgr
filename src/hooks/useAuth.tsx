@@ -97,34 +97,17 @@ const DEMO_USERS = [
   }
 ];
 
-// Simple TOTP implementation for demo
-const generateTOTP = (secret: string, timeWindow?: number): string => {
-  const time = timeWindow || Math.floor(Date.now() / 30000);
-  // Simpler demo implementation that generates consistent codes
-  const combined = secret + time.toString();
-  let hash = 0;
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return Math.abs(hash).toString().padStart(6, '0').slice(0, 6);
-};
+// Session management constants
+const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+const SESSION_KEY = 'demo_session';
+const LAST_ACTIVITY_KEY = 'demo_last_activity';
 
-const verifyTOTP = (secret: string, token: string): boolean => {
-  const currentTime = Math.floor(Date.now() / 30000);
-  
-  // Check current time window and previous/next windows for clock drift
-  for (let i = -1; i <= 1; i++) {
-    const timeWindow = currentTime + i;
-    const expectedToken = generateTOTP(secret, timeWindow);
-    if (expectedToken === token) {
-      return true;
-    }
-  }
-  
-  return false;
-};
+interface SessionData {
+  user: User;
+  profile: Profile;
+  mfaEnabled: boolean;
+  lastActivity: number;
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -132,27 +115,156 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [mfaEnabled, setMfaEnabled] = useState(false);
 
+  // Update last activity timestamp
+  const updateLastActivity = () => {
+    const now = Date.now();
+    localStorage.setItem(LAST_ACTIVITY_KEY, now.toString());
+    return now;
+  };
+
+  // Check if session is still valid (not expired due to inactivity)
+  const isSessionValid = (): boolean => {
+    const lastActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
+    if (!lastActivity) return false;
+    
+    const timeSinceLastActivity = Date.now() - parseInt(lastActivity);
+    return timeSinceLastActivity < IDLE_TIMEOUT;
+  };
+
+  // Save session with current timestamp
+  const saveSession = (userData: User, profileData: Profile, mfaEnabledData: boolean) => {
+    const now = updateLastActivity();
+    const sessionData: SessionData = {
+      user: userData,
+      profile: profileData,
+      mfaEnabled: mfaEnabledData,
+      lastActivity: now
+    };
+    
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+  };
+
+  // Load session if valid
+  const loadSession = (): boolean => {
+    try {
+      const sessionData = localStorage.getItem(SESSION_KEY);
+      
+      if (!sessionData) {
+        return false;
+      }
+
+      // Check if session is still valid (not expired due to inactivity)
+      if (!isSessionValid()) {
+        clearSession();
+        return false;
+      }
+
+      const session: SessionData = JSON.parse(sessionData);
+      
+      // Session is valid, restore state and update activity
+      setUser(session.user);
+      setProfile(session.profile);
+      setMfaEnabled(session.mfaEnabled);
+      updateLastActivity();
+      
+      return true;
+    } catch (error) {
+      console.error('Error loading session:', error);
+      clearSession();
+      return false;
+    }
+  };
+
+  // Clear session data
+  const clearSession = () => {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
+    // Keep old keys for backward compatibility cleanup
+    localStorage.removeItem('demo_user');
+    localStorage.removeItem('demo_profile');
+    localStorage.removeItem('demo_mfa_enabled');
+  };
+
+  // Auto logout when session expires due to inactivity
   useEffect(() => {
-    // Check for existing session in localStorage
+    if (!user) return;
+
+    const checkSessionExpiry = () => {
+      if (!isSessionValid()) {
+        // Session expired due to inactivity, logout user
+        setUser(null);
+        setProfile(null);
+        setMfaEnabled(false);
+        clearSession();
+        alert('Sua sessão expirou por inatividade. Faça login novamente.');
+      }
+    };
+
+    // Check every 30 seconds
+    const interval = setInterval(checkSessionExpiry, 30000);
+    
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // Track user activity to extend session
+  useEffect(() => {
+    if (!user) return;
+
+    const handleUserActivity = () => {
+      if (user && profile && isSessionValid()) {
+        // Update last activity and save session
+        saveSession(user, profile, mfaEnabled);
+      }
+    };
+
+    // Events that indicate user activity
+    const events = [
+      'mousedown', 
+      'mousemove', 
+      'keypress', 
+      'scroll', 
+      'touchstart', 
+      'click',
+      'focus',
+      'blur'
+    ];
+    
+    // Add throttling to avoid too frequent updates
+    let throttleTimeout: NodeJS.Timeout | null = null;
+    const throttledHandler = () => {
+      if (throttleTimeout) return;
+      
+      throttleTimeout = setTimeout(() => {
+        handleUserActivity();
+        throttleTimeout = null;
+      }, 1000); // Update at most once per second
+    };
+
+    events.forEach(event => {
+      document.addEventListener(event, throttledHandler, true);
+    });
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, throttledHandler, true);
+      });
+      if (throttleTimeout) {
+        clearTimeout(throttleTimeout);
+      }
+    };
+  }, [user, profile, mfaEnabled]);
+
+  useEffect(() => {
+    // Check for existing valid session on app start
     const checkExistingSession = () => {
-      // Não carregar sessão automaticamente - sempre começar na tela de login
-      // try {
-      //   const savedUser = localStorage.getItem('demo_user');
-      //   const savedProfile = localStorage.getItem('demo_profile');
-      //   const savedMfaEnabled = localStorage.getItem('demo_mfa_enabled');
-      //   
-      //   if (savedUser && savedProfile) {
-      //     setUser(JSON.parse(savedUser));
-      //     setProfile(JSON.parse(savedProfile));
-      //     setMfaEnabled(savedMfaEnabled === 'true');
-      //   }
-      // } catch (error) {
-      //   console.error('Error loading session:', error);
-      //   // Clear corrupted data
-      //   localStorage.removeItem('demo_user');
-      //   localStorage.removeItem('demo_profile');
-      //   localStorage.removeItem('demo_mfa_enabled');
-      // }
+      const hasValidSession = loadSession();
+      
+      if (!hasValidSession) {
+        // No valid session, start fresh
+        setUser(null);
+        setProfile(null);
+        setMfaEnabled(false);
+      }
       
       setLoading(false);
     };
@@ -192,10 +304,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfile(demoUser.profile);
     setMfaEnabled(userMfaEnabled);
     
-    // Save to localStorage
-    localStorage.setItem('demo_user', JSON.stringify(mockUser));
-    localStorage.setItem('demo_profile', JSON.stringify(demoUser.profile));
-    localStorage.setItem('demo_mfa_enabled', userMfaEnabled.toString());
+    // Save session with current timestamp
+    saveSession(mockUser, demoUser.profile, userMfaEnabled);
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -222,19 +332,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfile(newProfile);
     setMfaEnabled(false);
     
-    // Save to localStorage
-    localStorage.setItem('demo_user', JSON.stringify(mockUser));
-    localStorage.setItem('demo_profile', JSON.stringify(newProfile));
-    localStorage.setItem('demo_mfa_enabled', 'false');
+    // Save session with current timestamp
+    saveSession(mockUser, newProfile, false);
   };
 
   const signOut = async () => {
     setUser(null);
     setProfile(null);
     setMfaEnabled(false);
-    localStorage.removeItem('demo_user');
-    localStorage.removeItem('demo_profile');
-    localStorage.removeItem('demo_mfa_enabled');
+    clearSession();
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
@@ -242,7 +348,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const updatedProfile = { ...profile, ...updates };
     setProfile(updatedProfile);
-    localStorage.setItem('demo_profile', JSON.stringify(updatedProfile));
+    
+    // Update session with new profile data
+    if (user) {
+      saveSession(user, updatedProfile, mfaEnabled);
+    }
   };
 
   const enableMFA = async () => {
@@ -266,7 +376,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (isValid) {
       localStorage.setItem(`demo_mfa_${user.id}`, 'true');
       setMfaEnabled(true);
-      localStorage.setItem('demo_mfa_enabled', 'true');
+      
+      // Update session with MFA enabled
+      if (profile) {
+        saveSession(user, profile, true);
+      }
     }
     
     return isValid;
@@ -282,7 +396,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     localStorage.removeItem(`demo_mfa_${user.id}`);
     setMfaEnabled(false);
-    localStorage.setItem('demo_mfa_enabled', 'false');
+    
+    // Update session with MFA disabled
+    if (profile) {
+      saveSession(user, profile, false);
+    }
   };
 
   // Permission helpers
