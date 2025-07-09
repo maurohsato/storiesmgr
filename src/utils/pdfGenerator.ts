@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import { UserStoryData } from '../types';
 
-export const generateUserStoryPDF = (data: UserStoryData): void => {
+export const generateUserStoryPDF = (data: Omit<UserStoryData, 'createdAt'>, projectName?: string): void => {
   try {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
@@ -58,6 +58,9 @@ export const generateUserStoryPDF = (data: UserStoryData): void => {
     yPosition = addField('ID da História', data.id, yPosition);
     yPosition = addField('Data', new Date(data.date).toLocaleDateString('pt-BR'), yPosition);
     yPosition = addField('Autor', data.author, yPosition);
+    if (projectName) {
+      yPosition = addField('Projeto', projectName, yPosition);
+    }
     yPosition += 5;
 
     // Seção 2: Sobre o Usuário

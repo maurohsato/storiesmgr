@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth.tsx';
-import { User, LogOut, Settings, ChevronDown } from 'lucide-react';
+import { User, LogOut, Settings, ChevronDown, Shield, QrCode, X } from 'lucide-react';
 
 const UserMenu: React.FC = () => {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, mfaEnabled, enableMFA, verifyMFA, disableMFA } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [showMFASetup, setShowMFASetup] = useState(false);
+  const [mfaSecret, setMfaSecret] = useState('');
+  const [qrCode, setQrCode] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaError, setMfaError] = useState('');
 
   if (!profile) return null;
 
@@ -36,6 +42,63 @@ const UserMenu: React.FC = () => {
     }
   };
 
+  const handleEnableMFA = async () => {
+    try {
+      setMfaLoading(true);
+      setMfaError('');
+      const { secret, qrCode } = await enableMFA();
+      setMfaSecret(secret);
+      setQrCode(qrCode);
+      setShowMFASetup(true);
+    } catch (error) {
+      setMfaError('Erro ao configurar MFA');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleVerifyMFA = async () => {
+    if (!verificationCode || verificationCode.length !== 6) {
+      setMfaError('Digite um código de 6 dígitos');
+      return;
+    }
+
+    try {
+      setMfaLoading(true);
+      setMfaError('');
+      const isValid = await verifyMFA(verificationCode);
+      
+      if (isValid) {
+        setShowMFASetup(false);
+        setVerificationCode('');
+        alert('MFA ativado com sucesso!');
+      } else {
+        setMfaError('Código inválido. Verifique o código no seu Google Authenticator.');
+      }
+    } catch (error) {
+      setMfaError('Erro ao verificar código MFA');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleDisableMFA = async () => {
+    const code = prompt('Digite o código do Google Authenticator para desativar o MFA:');
+    if (!code) return;
+
+    try {
+      await disableMFA(code);
+      alert('MFA desativado com sucesso!');
+    } catch (error) {
+      alert('Código inválido ou erro ao desativar MFA');
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert('Copiado para a área de transferência!');
+  };
+
   return (
     <div className="relative">
       <button
@@ -50,8 +113,9 @@ const UserMenu: React.FC = () => {
             <div className="text-sm font-medium text-gray-900">
               {profile.full_name || profile.email}
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500 flex items-center">
               {getRoleLabel(profile.role)}
+              {mfaEnabled && <Shield className="h-3 w-3 ml-1 text-green-600" />}
             </div>
           </div>
           <ChevronDown className="h-4 w-4 text-gray-400" />
@@ -64,7 +128,7 @@ const UserMenu: React.FC = () => {
             className="fixed inset-0 z-10" 
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-72 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-20">
+          <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-20">
             <div className="py-1">
               {/* User Info */}
               <div className="px-4 py-3 border-b border-gray-100">
@@ -79,9 +143,17 @@ const UserMenu: React.FC = () => {
                     <p className="text-sm text-gray-500 truncate">
                       {profile.email}
                     </p>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${getRoleBadgeColor(profile.role)}`}>
-                      {getRoleLabel(profile.role)}
-                    </span>
+                    <div className="flex items-center mt-1">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(profile.role)}`}>
+                        {getRoleLabel(profile.role)}
+                      </span>
+                      {mfaEnabled && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <Shield className="h-3 w-3 mr-1" />
+                          MFA Ativo
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -98,21 +170,150 @@ const UserMenu: React.FC = () => {
                   <Settings className="h-4 w-4 mr-3" />
                   Configurações do Perfil
                 </button>
+
+                {/* MFA Settings */}
+                <div className="border-t border-gray-100 mt-1 pt-1">
+                  <div className="px-4 py-2">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Segurança
+                    </p>
+                  </div>
+                  
+                  {!mfaEnabled ? (
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        handleEnableMFA();
+                      }}
+                      disabled={mfaLoading}
+                      className="flex items-center w-full px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors disabled:opacity-50"
+                    >
+                      <Shield className="h-4 w-4 mr-3" />
+                      Ativar Autenticação 2FA
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        handleDisableMFA();
+                      }}
+                      className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+                    >
+                      <Shield className="h-4 w-4 mr-3" />
+                      Desativar Autenticação 2FA
+                    </button>
+                  )}
+                </div>
                 
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    handleSignOut();
-                  }}
-                  className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
-                >
-                  <LogOut className="h-4 w-4 mr-3" />
-                  Sair
-                </button>
+                <div className="border-t border-gray-100 mt-1 pt-1">
+                  <button
+                    onClick={() => {
+                      setIsOpen(false);
+                      handleSignOut();
+                    }}
+                    className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut className="h-4 w-4 mr-3" />
+                    Sair
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </>
+      )}
+
+      {/* MFA Setup Modal */}
+      {showMFASetup && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                Configurar Autenticação 2FA
+              </h3>
+              <button
+                onClick={() => setShowMFASetup(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="text-sm text-gray-600">
+                <p className="mb-2">1. Instale o Google Authenticator no seu celular</p>
+                <p className="mb-2">2. Escaneie o QR Code abaixo ou digite o código manualmente</p>
+                <p>3. Digite o código de 6 dígitos para confirmar</p>
+              </div>
+
+              {/* QR Code placeholder */}
+              <div className="flex justify-center">
+                <div className="bg-gray-100 p-4 rounded-lg">
+                  <QrCode className="h-32 w-32 text-gray-400" />
+                  <p className="text-xs text-center mt-2 text-gray-500">
+                    QR Code para {profile.email}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Código manual (se não conseguir escanear):
+                </label>
+                <div className="flex">
+                  <input
+                    type="text"
+                    value={mfaSecret}
+                    readOnly
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-sm font-mono"
+                  />
+                  <button
+                    onClick={() => copyToClipboard(mfaSecret)}
+                    className="px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 hover:bg-gray-100 text-sm"
+                  >
+                    Copiar
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Código de verificação:
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-center text-lg tracking-widest"
+                  placeholder="000000"
+                />
+              </div>
+
+              {mfaError && (
+                <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                  {mfaError}
+                </div>
+              )}
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowMFASetup(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleVerifyMFA}
+                  disabled={mfaLoading || verificationCode.length !== 6}
+                  className="flex-1 px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {mfaLoading ? 'Verificando...' : 'Ativar MFA'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
