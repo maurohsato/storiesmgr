@@ -206,39 +206,70 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user, profile, mfaEnabled]);
 
   const signIn = async (email: string, password: string, mfaCode?: string) => {
-    const { data, error } = await auth.signIn(email, password);
-    
-    if (error) throw error;
-    
-    if (data.user) {
-      // Check if MFA is enabled for this user
-      const userMfaEnabled = localStorage.getItem(`supabase_mfa_${data.user.id}`) === 'true';
+    try {
+      const { data, error } = await auth.signIn(email, password);
       
-      if (userMfaEnabled) {
-        if (!mfaCode) {
-          throw new Error('MFA_REQUIRED');
+      if (error) {
+        // Provide more specific error messages
+        if (error.message?.includes('Invalid login credentials') || error.message?.includes('invalid_credentials')) {
+          throw new Error('Email ou senha incorretos. Verifique suas credenciais ou crie uma nova conta.');
+        } else if (error.message?.includes('Email not confirmed')) {
+          throw new Error('Email não confirmado. Verifique sua caixa de entrada.');
+        } else if (error.message?.includes('Too many requests')) {
+          throw new Error('Muitas tentativas de login. Tente novamente em alguns minutos.');
         }
-        
-        // Para demonstração, aceitar qualquer código de 6 dígitos
-        if (!/^\d{6}$/.test(mfaCode)) {
-          throw new Error('Código MFA inválido. Verifique o código no seu Google Authenticator.');
-        }
+        throw error;
       }
+      
+      if (data.user) {
+        // Check if MFA is enabled for this user
+        const userMfaEnabled = localStorage.getItem(`supabase_mfa_${data.user.id}`) === 'true';
+        
+        if (userMfaEnabled) {
+          if (!mfaCode) {
+            throw new Error('MFA_REQUIRED');
+          }
+          
+          // Para demonstração, aceitar qualquer código de 6 dígitos
+          if (!/^\d{6}$/.test(mfaCode)) {
+            throw new Error('Código MFA inválido. Verifique o código no seu Google Authenticator.');
+          }
+        }
 
-      setUser(data.user);
-      await loadUserProfile(data.user.id);
+        setUser(data.user);
+        await loadUserProfile(data.user.id);
+      }
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      throw error;
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { data, error } = await auth.signUp(email, password, fullName);
-    
-    if (error) throw error;
-    
-    if (data.user) {
-      // Registration successful, user needs to verify email
-      return;
+    try {
+      const { data, error } = await auth.signUp(email, password, fullName);
+      
+      if (error) {
+        // Provide more specific error messages for signup
+        if (error.message?.includes('User already registered')) {
+          throw new Error('Este email já está cadastrado. Tente fazer login ou use outro email.');
+        } else if (error.message?.includes('Password should be at least')) {
+          throw new Error('A senha deve ter pelo menos 6 caracteres.');
+        } else if (error.message?.includes('Invalid email')) {
+          throw new Error('Email inválido. Verifique o formato do email.');
+        }
+        throw error;
+      }
+      
+      if (data.user) {
+        // Registration successful, user needs to verify email
+        return;
+      }
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      throw error;
     }
+  };
   };
 
   const signOut = async () => {

@@ -27,6 +27,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
       if (err.message === 'MFA_REQUIRED') {
         setRequiresMFA(true);
         setError('');
+      } else if (err.message?.includes('Invalid login credentials') || err.message?.includes('invalid_credentials')) {
+        setError('Email ou senha incorretos. Verifique suas credenciais ou crie uma nova conta.');
       } else {
         setError(err.message || 'Erro ao fazer login');
       }
@@ -202,6 +204,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
               <p className="text-xs text-blue-800">
                 <strong>🔐 MFA Disponível:</strong> Configure autenticação de dois fatores 
                 no menu do usuário após fazer login.
+              </p>
+            </div>
+            <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
+              <p className="text-xs text-yellow-800">
+                <strong>👤 Primeira vez?</strong> Se você não tem uma conta, clique em "Cadastre-se" 
+                para criar uma nova conta. Para administradores: acesse /supabase-validation para 
+                verificar a configuração do sistema.
               </p>
             </div>
           </div>

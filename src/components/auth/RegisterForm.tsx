@@ -40,6 +40,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
       await signUp(formData.email, formData.password, formData.fullName);
       setSuccess(true);
     } catch (err: any) {
+      // The error handling is now done in the useAuth hook
       setError(err.message || 'Erro ao criar conta');
     } finally {
       setLoading(false);
