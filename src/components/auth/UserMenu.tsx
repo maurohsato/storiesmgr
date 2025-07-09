@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../hooks/useAuth.tsx';
 import { User, LogOut, Settings, ChevronDown } from 'lucide-react';
 
 const UserMenu: React.FC = () => {
