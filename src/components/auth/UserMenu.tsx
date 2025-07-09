@@ -52,6 +52,7 @@ const UserMenu: React.FC = () => {
       setShowMFASetup(true);
     } catch (error) {
       setMfaError('Erro ao configurar MFA');
+      console.error('MFA setup error:', error);
     } finally {
       setMfaLoading(false);
     }
@@ -248,24 +249,31 @@ const UserMenu: React.FC = () => {
 
               {/* QR Code placeholder */}
               <div className="flex justify-center">
-                <div className="bg-gray-100 p-4 rounded-lg">
-                  <QrCode className="h-32 w-32 text-gray-400" />
-                  <p className="text-xs text-center mt-2 text-gray-500">
-                    QR Code para {profile.email}
-                  </p>
+                <div className="bg-white border-2 border-gray-300 p-4 rounded-lg">
+                  <div className="w-48 h-48 bg-white flex items-center justify-center border border-gray-200 rounded">
+                    <div className="text-center">
+                      <QrCode className="h-16 w-16 text-gray-400 mx-auto mb-2" />
+                      <p className="text-xs text-gray-500">
+                        QR Code para<br/>{profile.email}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-2">
+                        Use o Google Authenticator<br/>para escanear
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Código manual (se não conseguir escanear):
+                  Código para configuração manual:
                 </label>
-                <div className="flex">
+                <div className="flex mb-2">
                   <input
                     type="text"
                     value={mfaSecret}
                     readOnly
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-sm font-mono"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-xs font-mono"
                   />
                   <button
                     onClick={() => copyToClipboard(mfaSecret)}
@@ -273,6 +281,12 @@ const UserMenu: React.FC = () => {
                   >
                     Copiar
                   </button>
+                </div>
+                <div className="text-xs text-gray-500 bg-blue-50 p-2 rounded">
+                  <p><strong>Para demonstração:</strong></p>
+                  <p>• Use qualquer código de 6 dígitos numéricos</p>
+                  <p>• Exemplo: 123456, 000000, 999999</p>
+                  <p>• O sistema aceita qualquer código válido</p>
                 </div>
               </div>
 

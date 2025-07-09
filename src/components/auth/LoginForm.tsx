@@ -214,8 +214,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
             </div>
             <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
               <p className="text-xs text-yellow-800">
-                <strong>🔐 MFA:</strong> Todas as contas suportam autenticação de dois fatores. 
-                Configure no menu do usuário após fazer login.
+                <strong>🔐 MFA (Demonstração):</strong> Configure 2FA no menu do usuário. 
+                Use qualquer código de 6 dígitos (ex: 123456) para testar.
               </p>
             </div>
           </div>

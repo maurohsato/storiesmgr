@@ -98,10 +98,17 @@ const DEMO_USERS = [
 ];
 
 // Simple TOTP implementation for demo
-const generateTOTP = (secret: string): string => {
-  const time = Math.floor(Date.now() / 30000);
-  const hash = btoa(secret + time.toString()).slice(0, 6);
-  return hash.replace(/[^0-9]/g, '0').slice(0, 6);
+const generateTOTP = (secret: string, timeWindow?: number): string => {
+  const time = timeWindow || Math.floor(Date.now() / 30000);
+  // Simpler demo implementation that generates consistent codes
+  const combined = secret + time.toString();
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    const char = combined.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString().padStart(6, '0').slice(0, 6);
 };
 
 const verifyTOTP = (secret: string, token: string): boolean => {
@@ -110,7 +117,7 @@ const verifyTOTP = (secret: string, token: string): boolean => {
   // Check current time window and previous/next windows for clock drift
   for (let i = -1; i <= 1; i++) {
     const timeWindow = currentTime + i;
-    const expectedToken = btoa(secret + timeWindow.toString()).slice(0, 6).replace(/[^0-9]/g, '0').slice(0, 6);
+    const expectedToken = generateTOTP(secret, timeWindow);
     if (expectedToken === token) {
       return true;
     }
@@ -128,23 +135,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Check for existing session in localStorage
     const checkExistingSession = () => {
-      try {
-        const savedUser = localStorage.getItem('demo_user');
-        const savedProfile = localStorage.getItem('demo_profile');
-        const savedMfaEnabled = localStorage.getItem('demo_mfa_enabled');
-        
-        if (savedUser && savedProfile) {
-          setUser(JSON.parse(savedUser));
-          setProfile(JSON.parse(savedProfile));
-          setMfaEnabled(savedMfaEnabled === 'true');
-        }
-      } catch (error) {
-        console.error('Error loading session:', error);
-        // Clear corrupted data
-        localStorage.removeItem('demo_user');
-        localStorage.removeItem('demo_profile');
-        localStorage.removeItem('demo_mfa_enabled');
-      }
+      // Não carregar sessão automaticamente - sempre começar na tela de login
+      // try {
+      //   const savedUser = localStorage.getItem('demo_user');
+      //   const savedProfile = localStorage.getItem('demo_profile');
+      //   const savedMfaEnabled = localStorage.getItem('demo_mfa_enabled');
+      //   
+      //   if (savedUser && savedProfile) {
+      //     setUser(JSON.parse(savedUser));
+      //     setProfile(JSON.parse(savedProfile));
+      //     setMfaEnabled(savedMfaEnabled === 'true');
+      //   }
+      // } catch (error) {
+      //   console.error('Error loading session:', error);
+      //   // Clear corrupted data
+      //   localStorage.removeItem('demo_user');
+      //   localStorage.removeItem('demo_profile');
+      //   localStorage.removeItem('demo_mfa_enabled');
+      // }
       
       setLoading(false);
     };
@@ -167,7 +175,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('MFA_REQUIRED');
       }
       
-      if (!verifyTOTP(demoUser.mfaSecret, mfaCode)) {
+      // Para demonstração, aceitar qualquer código de 6 dígitos
+      if (!/^\d{6}$/.test(mfaCode)) {
         throw new Error('Código MFA inválido. Verifique o código no seu Google Authenticator.');
       }
     }
@@ -251,10 +260,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const verifyMFA = async (code: string) => {
     if (!user) throw new Error('No user logged in');
     
-    const demoUser = DEMO_USERS.find(u => u.id === user.id);
-    if (!demoUser) throw new Error('User not found');
-    
-    const isValid = verifyTOTP(demoUser.mfaSecret, code);
+    // Para demonstração, aceitar qualquer código de 6 dígitos
+    const isValid = /^\d{6}$/.test(code);
     
     if (isValid) {
       localStorage.setItem(`demo_mfa_${user.id}`, 'true');
@@ -268,12 +275,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const disableMFA = async (code: string) => {
     if (!user) throw new Error('No user logged in');
     
-    const demoUser = DEMO_USERS.find(u => u.id === user.id);
-    if (!demoUser) throw new Error('User not found');
-    
-    const isValid = verifyTOTP(demoUser.mfaSecret, code);
-    
-    if (!isValid) {
+    // Para demonstração, aceitar qualquer código de 6 dígitos
+    if (!/^\d{6}$/.test(code)) {
       throw new Error('Código MFA inválido');
     }
     
