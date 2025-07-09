@@ -5,11 +5,16 @@ import { Plus, Users, Edit, Trash2 } from 'lucide-react';
 import { Team } from '../types';
 
 const Teams: React.FC = () => {
-  const { teams, setTeams } = useAppContext();
+  const { teams, deleteTeam } = useAppContext();
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
 
-  const handleDelete = (teamId: string) => {
-    setTeams(prev => prev.filter(team => team.id !== teamId));
+  const handleDelete = async (teamId: string) => {
+    try {
+      await deleteTeam(teamId);
+    } catch (error) {
+      console.error('Error deleting team:', error);
+      alert('Erro ao excluir time. Tente novamente.');
+    }
     setShowDeleteModal(null);
   };
 

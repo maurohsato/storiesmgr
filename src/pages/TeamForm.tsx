@@ -8,8 +8,9 @@ import { ArrowLeft, Plus, X } from 'lucide-react';
 const TeamForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { teams, setTeams } = useAppContext();
+  const { teams, createTeam, updateTeam } = useAppContext();
   const isEditing = Boolean(id);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState<Omit<Team, 'id' | 'createdAt'>>({
     name: '',
@@ -32,25 +33,23 @@ const TeamForm: React.FC = () => {
     }
   }, [isEditing, id, teams]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     
-    if (isEditing && id) {
-      setTeams(prev => prev.map(team => 
-        team.id === id 
-          ? { ...team, ...formData }
-          : team
-      ));
-    } else {
-      const newTeam: Team = {
-        id: uuidv4(),
-        ...formData,
-        createdAt: new Date().toISOString(),
-      };
-      setTeams(prev => [...prev, newTeam]);
+    try {
+      if (isEditing && id) {
+        await updateTeam(id, formData);
+      } else {
+        await createTeam(formData);
+      }
+      navigate('/teams');
+    } catch (error) {
+      console.error('Error saving team:', error);
+      alert('Erro ao salvar time. Tente novamente.');
+    } finally {
+      setSubmitting(false);
     }
-    
-    navigate('/teams');
   };
 
   const addMember = () => {

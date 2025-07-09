@@ -15,7 +15,7 @@ const UserStoryForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const { projects, teams, userStories, setUserStories } = useAppContext();
+  const { projects, teams, userStories, createUserStory, updateUserStory } = useAppContext();
   
   const projectId = searchParams.get('projectId') || '';
   const isEditing = Boolean(id);
@@ -116,28 +116,21 @@ const UserStoryForm: React.FC = () => {
     return (filledFields.length / requiredFields.length) * 100;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.projectId) {
       alert('Por favor, selecione um projeto antes de salvar.');
       return;
     }
 
     setIsSubmitting(true);
-    
-    const storyData: UserStoryData = {
-      ...formData,
-      createdAt: isEditing ? userStories.find(s => s.id === id)?.createdAt || new Date().toISOString() : new Date().toISOString(),
-    };
-    
-    if (isEditing) {
-      setUserStories(prev => prev.map(story => 
-        story.id === id ? storyData : story
-      ));
-    } else {
-      setUserStories(prev => [...prev, storyData]);
-    }
-    
-    setTimeout(() => {
+
+    try {
+      if (isEditing && id) {
+        await updateUserStory(id, formData);
+      } else {
+        await createUserStory(formData);
+      }
+      
       setIsSubmitting(false);
       if (!isEditing) {
         localStorage.removeItem('userStoryForm');
@@ -148,7 +141,11 @@ const UserStoryForm: React.FC = () => {
       } else {
         navigate('/stories');
       }
-    }, 1000);
+    } catch (error) {
+      console.error('Error saving story:', error);
+      alert('Erro ao salvar história. Tente novamente.');
+      setIsSubmitting(false);
+    }
   };
 
   const handleExportPDF = () => {
@@ -181,21 +178,14 @@ const UserStoryForm: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    
-    const storyData: UserStoryData = {
-      ...formData,
-      createdAt: isEditing ? userStories.find(s => s.id === id)?.createdAt || new Date().toISOString() : new Date().toISOString(),
-    };
-    
-    if (isEditing) {
-      setUserStories(prev => prev.map(story => 
-        story.id === id ? storyData : story
-      ));
-    } else {
-      setUserStories(prev => [...prev, storyData]);
-    }
-    
-    setTimeout(() => {
+
+    try {
+      if (isEditing && id) {
+        await updateUserStory(id, formData);
+      } else {
+        await createUserStory(formData);
+      }
+      
       setIsSubmitting(false);
       if (!isEditing) {
         localStorage.removeItem('userStoryForm');
@@ -206,7 +196,11 @@ const UserStoryForm: React.FC = () => {
       } else {
         navigate('/stories');
       }
-    }, 1000);
+    } catch (error) {
+      console.error('Error saving story:', error);
+      alert('Erro ao salvar história. Tente novamente.');
+      setIsSubmitting(false);
+    }
   };
 
   const sections = [

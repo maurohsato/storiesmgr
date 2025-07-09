@@ -4,13 +4,18 @@ import { useAppContext } from '../context/AppContext';
 import { Plus, FileText, Edit, Trash2, Filter } from 'lucide-react';
 
 const Stories: React.FC = () => {
-  const { userStories, setUserStories, projects } = useAppContext();
+  const { userStories, projects, deleteUserStory } = useAppContext();
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
   const [filterProject, setFilterProject] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
 
-  const handleDelete = (storyId: string) => {
-    setUserStories(prev => prev.filter(story => story.id !== storyId));
+  const handleDelete = async (storyId: string) => {
+    try {
+      await deleteUserStory(storyId);
+    } catch (error) {
+      console.error('Error deleting story:', error);
+      alert('Erro ao excluir história. Tente novamente.');
+    }
     setShowDeleteModal(null);
   };
 

@@ -1,16 +1,36 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useSupabaseData } from '../hooks/useSupabaseData';
 import { Team, Client, Project, UserStoryData } from '../types';
 
 interface AppContextType {
   teams: Team[];
-  setTeams: (teams: Team[] | ((prev: Team[]) => Team[])) => void;
   clients: Client[];
-  setClients: (clients: Client[] | ((prev: Client[]) => Client[])) => void;
   projects: Project[];
-  setProjects: (projects: Project[] | ((prev: Project[]) => Project[])) => void;
   userStories: UserStoryData[];
-  setUserStories: (stories: UserStoryData[] | ((prev: UserStoryData[]) => UserStoryData[])) => void;
+  loading: boolean;
+  
+  // Team operations
+  createTeam: (team: Omit<Team, 'id' | 'createdAt'>) => Promise<Team>;
+  updateTeam: (id: string, updates: Partial<Team>) => Promise<Team>;
+  deleteTeam: (id: string) => Promise<void>;
+  
+  // Client operations
+  createClient: (client: Omit<Client, 'id' | 'createdAt'>) => Promise<Client>;
+  updateClient: (id: string, updates: Partial<Client>) => Promise<Client>;
+  deleteClient: (id: string) => Promise<void>;
+  
+  // Project operations
+  createProject: (project: Omit<Project, 'id' | 'createdAt'>) => Promise<Project>;
+  updateProject: (id: string, updates: Partial<Project>) => Promise<Project>;
+  deleteProject: (id: string) => Promise<void>;
+  
+  // User Story operations
+  createUserStory: (story: Omit<UserStoryData, 'createdAt'>) => Promise<UserStoryData>;
+  updateUserStory: (id: string, updates: Partial<UserStoryData>) => Promise<UserStoryData>;
+  deleteUserStory: (id: string) => Promise<void>;
+  
+  // Refresh data
+  loadAllData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -28,23 +48,11 @@ interface AppProviderProps {
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  const [teams, setTeams] = useLocalStorage<Team[]>('teams', []);
-  const [clients, setClients] = useLocalStorage<Client[]>('clients', []);
-  const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
-  const [userStories, setUserStories] = useLocalStorage<UserStoryData[]>('userStories', []);
+  const supabaseData = useSupabaseData();
 
   return (
     <AppContext.Provider
-      value={{
-        teams,
-        setTeams,
-        clients,
-        setClients,
-        projects,
-        setProjects,
-        userStories,
-        setUserStories,
-      }}
+      value={supabaseData}
     >
       {children}
     </AppContext.Provider>

@@ -4,11 +4,16 @@ import { useAppContext } from '../context/AppContext';
 import { Plus, Building2, Edit, Trash2, Mail, Phone } from 'lucide-react';
 
 const Clients: React.FC = () => {
-  const { clients, setClients } = useAppContext();
+  const { clients, deleteClient } = useAppContext();
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
 
-  const handleDelete = (clientId: string) => {
-    setClients(prev => prev.filter(client => client.id !== clientId));
+  const handleDelete = async (clientId: string) => {
+    try {
+      await deleteClient(clientId);
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      alert('Erro ao excluir cliente. Tente novamente.');
+    }
     setShowDeleteModal(null);
   };
 

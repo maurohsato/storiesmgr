@@ -8,8 +8,9 @@ import { ArrowLeft, Plus, X } from 'lucide-react';
 const ClientForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { clients, setClients } = useAppContext();
+  const { clients, createClient, updateClient } = useAppContext();
   const isEditing = Boolean(id);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState<Omit<Client, 'id' | 'createdAt'>>({
     companyName: '',
@@ -43,25 +44,23 @@ const ClientForm: React.FC = () => {
     }
   }, [isEditing, id, clients]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     
-    if (isEditing && id) {
-      setClients(prev => prev.map(client => 
-        client.id === id 
-          ? { ...client, ...formData }
-          : client
-      ));
-    } else {
-      const newClient: Client = {
-        id: uuidv4(),
-        ...formData,
-        createdAt: new Date().toISOString(),
-      };
-      setClients(prev => [...prev, newClient]);
+    try {
+      if (isEditing && id) {
+        await updateClient(id, formData);
+      } else {
+        await createClient(formData);
+      }
+      navigate('/clients');
+    } catch (error) {
+      console.error('Error saving client:', error);
+      alert('Erro ao salvar cliente. Tente novamente.');
+    } finally {
+      setSubmitting(false);
     }
-    
-    navigate('/clients');
   };
 
   const addCollaborator = () => {

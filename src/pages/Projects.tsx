@@ -4,11 +4,16 @@ import { useAppContext } from '../context/AppContext';
 import { Plus, FolderOpen, Edit, Trash2, Calendar, Users, Building2 } from 'lucide-react';
 
 const Projects: React.FC = () => {
-  const { projects, setProjects, clients, teams } = useAppContext();
+  const { projects, clients, teams, deleteProject } = useAppContext();
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
 
-  const handleDelete = (projectId: string) => {
-    setProjects(prev => prev.filter(project => project.id !== projectId));
+  const handleDelete = async (projectId: string) => {
+    try {
+      await deleteProject(projectId);
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      alert('Erro ao excluir projeto. Tente novamente.');
+    }
     setShowDeleteModal(null);
   };
 

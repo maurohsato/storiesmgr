@@ -8,8 +8,9 @@ import { ArrowLeft, Plus, X } from 'lucide-react';
 const ProjectForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { projects, setProjects, clients, teams } = useAppContext();
+  const { projects, clients, teams, createProject, updateProject } = useAppContext();
   const isEditing = Boolean(id);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState<Omit<Project, 'id' | 'createdAt'>>({
     name: '',
@@ -46,25 +47,23 @@ const ProjectForm: React.FC = () => {
     }
   }, [isEditing, id, projects]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     
-    if (isEditing && id) {
-      setProjects(prev => prev.map(project => 
-        project.id === id 
-          ? { ...project, ...formData }
-          : project
-      ));
-    } else {
-      const newProject: Project = {
-        id: uuidv4(),
-        ...formData,
-        createdAt: new Date().toISOString(),
-      };
-      setProjects(prev => [...prev, newProject]);
+    try {
+      if (isEditing && id) {
+        await updateProject(id, formData);
+      } else {
+        await createProject(formData);
+      }
+      navigate('/projects');
+    } catch (error) {
+      console.error('Error saving project:', error);
+      alert('Erro ao salvar projeto. Tente novamente.');
+    } finally {
+      setSubmitting(false);
     }
-    
-    navigate('/projects');
   };
 
   const addTechnology = () => {
