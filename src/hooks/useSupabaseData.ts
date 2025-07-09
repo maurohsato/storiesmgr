@@ -100,35 +100,20 @@ export const useSupabaseData = () => {
       const storiesData = await db.getUserStories();
       setUserStories(storiesData.map(convertDbUserStory));
     } catch (error) {
-      console.error('Error loading data:', error);
-      // Fallback to localStorage if Supabase fails
-      loadFromLocalStorage();
+      console.error('Error loading data from Supabase:', error);
+      throw error; // Re-throw to let the UI handle the error
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Fallback to localStorage
-  const loadFromLocalStorage = () => {
-    try {
-      const savedTeams = localStorage.getItem('teams');
-      const savedClients = localStorage.getItem('clients');
-      const savedProjects = localStorage.getItem('projects');
-      const savedStories = localStorage.getItem('userStories');
-
-      if (savedTeams) setTeams(JSON.parse(savedTeams));
-      if (savedClients) setClients(JSON.parse(savedClients));
-      if (savedProjects) setProjects(JSON.parse(savedProjects));
-      if (savedStories) setUserStories(JSON.parse(savedStories));
-    } catch (error) {
-      console.error('Error loading from localStorage:', error);
     }
   };
 
   // Load data when user changes
   useEffect(() => {
     if (user) {
-      loadAllData();
+      loadAllData().catch(error => {
+        console.error('Failed to load data:', error);
+        // You could show a toast notification here
+      });
     } else {
       // Clear data when user logs out
       setTeams([]);
@@ -141,334 +126,171 @@ export const useSupabaseData = () => {
 
   // Team operations
   const createTeam = async (team: Omit<Team, 'id' | 'createdAt'>) => {
-    try {
-      const dbTeam = await db.createTeam({
-        name: team.name,
-        description: team.description,
-        members: team.members,
-      });
-      const newTeam = convertDbTeam(dbTeam);
-      setTeams(prev => [...prev, newTeam]);
-      return newTeam;
-    } catch (error) {
-      console.error('Error creating team:', error);
-      // Fallback to localStorage
-      const newTeam: Team = {
-        id: uuidv4(),
-        ...team,
-        createdAt: new Date().toISOString(),
-      };
-      setTeams(prev => {
-        const updated = [...prev, newTeam];
-        localStorage.setItem('teams', JSON.stringify(updated));
-        return updated;
-      });
-      return newTeam;
-    }
+    const dbTeam = await db.createTeam({
+      name: team.name,
+      description: team.description,
+      members: team.members,
+    });
+    const newTeam = convertDbTeam(dbTeam);
+    setTeams(prev => [...prev, newTeam]);
+    return newTeam;
   };
 
   const updateTeam = async (id: string, updates: Partial<Team>) => {
-    try {
-      const dbUpdates: Database['public']['Tables']['teams']['Update'] = {
-        name: updates.name,
-        description: updates.description,
-        members: updates.members,
-      };
-      const dbTeam = await db.updateTeam(id, dbUpdates);
-      const updatedTeam = convertDbTeam(dbTeam);
-      setTeams(prev => prev.map(team => team.id === id ? updatedTeam : team));
-      return updatedTeam;
-    } catch (error) {
-      console.error('Error updating team:', error);
-      // Fallback to localStorage
-      const updatedTeam = teams.find(t => t.id === id);
-      if (!updatedTeam) throw new Error('Team not found');
-      
-      const newTeam = { ...updatedTeam, ...updates };
-      setTeams(prev => {
-        const updated = prev.map(team => team.id === id ? newTeam : team);
-        localStorage.setItem('teams', JSON.stringify(updated));
-        return updated;
-      });
-      return newTeam;
-    }
+    const dbUpdates: Database['public']['Tables']['teams']['Update'] = {
+      name: updates.name,
+      description: updates.description,
+      members: updates.members,
+    };
+    const dbTeam = await db.updateTeam(id, dbUpdates);
+    const updatedTeam = convertDbTeam(dbTeam);
+    setTeams(prev => prev.map(team => team.id === id ? updatedTeam : team));
+    return updatedTeam;
   };
 
   const deleteTeam = async (id: string) => {
-    try {
-      await db.deleteTeam(id);
-      setTeams(prev => prev.filter(team => team.id !== id));
-    } catch (error) {
-      console.error('Error deleting team:', error);
-      // Fallback to localStorage
-      setTeams(prev => {
-        const updated = prev.filter(team => team.id !== id);
-        localStorage.setItem('teams', JSON.stringify(updated));
-        return updated;
-      });
-    }
+    await db.deleteTeam(id);
+    setTeams(prev => prev.filter(team => team.id !== id));
   };
 
   // Client operations
   const createClient = async (client: Omit<Client, 'id' | 'createdAt'>) => {
-    try {
-      const dbClient = await db.createClient({
-        company_name: client.companyName,
-        contact_person: client.contactPerson,
-        email: client.email,
-        phone: client.phone,
-        address: client.address,
-        collaborators: client.collaborators as any,
-      });
-      const newClient = convertDbClient(dbClient);
-      setClients(prev => [...prev, newClient]);
-      return newClient;
-    } catch (error) {
-      console.error('Error creating client:', error);
-      // Fallback to localStorage
-      const newClient: Client = {
-        id: uuidv4(),
-        ...client,
-        createdAt: new Date().toISOString(),
-      };
-      setClients(prev => {
-        const updated = [...prev, newClient];
-        localStorage.setItem('clients', JSON.stringify(updated));
-        return updated;
-      });
-      return newClient;
-    }
+    const dbClient = await db.createClient({
+      company_name: client.companyName,
+      contact_person: client.contactPerson,
+      email: client.email,
+      phone: client.phone,
+      address: client.address,
+      collaborators: client.collaborators as any,
+    });
+    const newClient = convertDbClient(dbClient);
+    setClients(prev => [...prev, newClient]);
+    return newClient;
   };
 
   const updateClient = async (id: string, updates: Partial<Client>) => {
-    try {
-      const dbUpdates: Database['public']['Tables']['clients']['Update'] = {
-        company_name: updates.companyName,
-        contact_person: updates.contactPerson,
-        email: updates.email,
-        phone: updates.phone,
-        address: updates.address,
-        collaborators: updates.collaborators as any,
-      };
-      const dbClient = await db.updateClient(id, dbUpdates);
-      const updatedClient = convertDbClient(dbClient);
-      setClients(prev => prev.map(client => client.id === id ? updatedClient : client));
-      return updatedClient;
-    } catch (error) {
-      console.error('Error updating client:', error);
-      // Fallback to localStorage
-      const updatedClient = clients.find(c => c.id === id);
-      if (!updatedClient) throw new Error('Client not found');
-      
-      const newClient = { ...updatedClient, ...updates };
-      setClients(prev => {
-        const updated = prev.map(client => client.id === id ? newClient : client);
-        localStorage.setItem('clients', JSON.stringify(updated));
-        return updated;
-      });
-      return newClient;
-    }
+    const dbUpdates: Database['public']['Tables']['clients']['Update'] = {
+      company_name: updates.companyName,
+      contact_person: updates.contactPerson,
+      email: updates.email,
+      phone: updates.phone,
+      address: updates.address,
+      collaborators: updates.collaborators as any,
+    };
+    const dbClient = await db.updateClient(id, dbUpdates);
+    const updatedClient = convertDbClient(dbClient);
+    setClients(prev => prev.map(client => client.id === id ? updatedClient : client));
+    return updatedClient;
   };
 
   const deleteClient = async (id: string) => {
-    try {
-      await db.deleteClient(id);
-      setClients(prev => prev.filter(client => client.id !== id));
-    } catch (error) {
-      console.error('Error deleting client:', error);
-      // Fallback to localStorage
-      setClients(prev => {
-        const updated = prev.filter(client => client.id !== id);
-        localStorage.setItem('clients', JSON.stringify(updated));
-        return updated;
-      });
-    }
+    await db.deleteClient(id);
+    setClients(prev => prev.filter(client => client.id !== id));
   };
 
   // Project operations
   const createProject = async (project: Omit<Project, 'id' | 'createdAt'>) => {
-    try {
-      const dbProject = await db.createProject({
-        name: project.name,
-        description: project.description,
-        client_id: project.clientId || null,
-        team_id: project.teamId || null,
-        duration: project.duration,
-        technologies: project.technologies,
-        status: project.status,
-        start_date: project.startDate,
-        end_date: project.endDate || null,
-        internal_notes: project.internalNotes,
-      });
-      const newProject = convertDbProject(dbProject);
-      setProjects(prev => [...prev, newProject]);
-      return newProject;
-    } catch (error) {
-      console.error('Error creating project:', error);
-      // Fallback to localStorage
-      const newProject: Project = {
-        id: uuidv4(),
-        ...project,
-        createdAt: new Date().toISOString(),
-      };
-      setProjects(prev => {
-        const updated = [...prev, newProject];
-        localStorage.setItem('projects', JSON.stringify(updated));
-        return updated;
-      });
-      return newProject;
-    }
+    const dbProject = await db.createProject({
+      name: project.name,
+      description: project.description,
+      client_id: project.clientId || null,
+      team_id: project.teamId || null,
+      duration: project.duration,
+      technologies: project.technologies,
+      status: project.status,
+      start_date: project.startDate,
+      end_date: project.endDate || null,
+      internal_notes: project.internalNotes,
+    });
+    const newProject = convertDbProject(dbProject);
+    setProjects(prev => [...prev, newProject]);
+    return newProject;
   };
 
   const updateProject = async (id: string, updates: Partial<Project>) => {
-    try {
-      const dbUpdates: Database['public']['Tables']['projects']['Update'] = {
-        name: updates.name,
-        description: updates.description,
-        client_id: updates.clientId || null,
-        team_id: updates.teamId || null,
-        duration: updates.duration,
-        technologies: updates.technologies,
-        status: updates.status,
-        start_date: updates.startDate,
-        end_date: updates.endDate || null,
-        internal_notes: updates.internalNotes,
-      };
-      const dbProject = await db.updateProject(id, dbUpdates);
-      const updatedProject = convertDbProject(dbProject);
-      setProjects(prev => prev.map(project => project.id === id ? updatedProject : project));
-      return updatedProject;
-    } catch (error) {
-      console.error('Error updating project:', error);
-      // Fallback to localStorage
-      const updatedProject = projects.find(p => p.id === id);
-      if (!updatedProject) throw new Error('Project not found');
-      
-      const newProject = { ...updatedProject, ...updates };
-      setProjects(prev => {
-        const updated = prev.map(project => project.id === id ? newProject : project);
-        localStorage.setItem('projects', JSON.stringify(updated));
-        return updated;
-      });
-      return newProject;
-    }
+    const dbUpdates: Database['public']['Tables']['projects']['Update'] = {
+      name: updates.name,
+      description: updates.description,
+      client_id: updates.clientId || null,
+      team_id: updates.teamId || null,
+      duration: updates.duration,
+      technologies: updates.technologies,
+      status: updates.status,
+      start_date: updates.startDate,
+      end_date: updates.endDate || null,
+      internal_notes: updates.internalNotes,
+    };
+    const dbProject = await db.updateProject(id, dbUpdates);
+    const updatedProject = convertDbProject(dbProject);
+    setProjects(prev => prev.map(project => project.id === id ? updatedProject : project));
+    return updatedProject;
   };
 
   const deleteProject = async (id: string) => {
-    try {
-      await db.deleteProject(id);
-      setProjects(prev => prev.filter(project => project.id !== id));
-    } catch (error) {
-      console.error('Error deleting project:', error);
-      // Fallback to localStorage
-      setProjects(prev => {
-        const updated = prev.filter(project => project.id !== id);
-        localStorage.setItem('projects', JSON.stringify(updated));
-        return updated;
-      });
-    }
+    await db.deleteProject(id);
+    setProjects(prev => prev.filter(project => project.id !== id));
   };
 
   // User Story operations
   const createUserStory = async (story: Omit<UserStoryData, 'createdAt'>) => {
-    try {
-      const dbStory = await db.createUserStory({
-        id: story.id,
-        project_id: story.projectId || null,
-        date: story.date,
-        author: story.author,
-        user_persona: story.userPersona,
-        user_role: story.userRole,
-        user_constraints: story.userConstraints,
-        user_desire: story.userDesire,
-        user_importance: story.userImportance,
-        current_problem: story.currentProblem,
-        main_steps: story.mainSteps,
-        alternative_flows: story.alternativeFlows,
-        business_rules: story.businessRules,
-        validations: story.validations,
-        acceptance_criteria: story.acceptanceCriteria,
-        dependencies: story.dependencies,
-        technical_risks: story.technicalRisks,
-        requires_spike: story.requiresSpike,
-        additional_comments: story.additionalComments,
-        status: story.status,
-      });
-      const newStory = convertDbUserStory(dbStory);
-      setUserStories(prev => [...prev, newStory]);
-      return newStory;
-    } catch (error) {
-      console.error('Error creating user story:', error);
-      // Fallback to localStorage
-      const newStory: UserStoryData = {
-        ...story,
-        createdAt: new Date().toISOString(),
-      };
-      setUserStories(prev => {
-        const updated = [...prev, newStory];
-        localStorage.setItem('userStories', JSON.stringify(updated));
-        return updated;
-      });
-      return newStory;
-    }
+    const dbStory = await db.createUserStory({
+      id: story.id,
+      project_id: story.projectId || null,
+      date: story.date,
+      author: story.author,
+      user_persona: story.userPersona,
+      user_role: story.userRole,
+      user_constraints: story.userConstraints,
+      user_desire: story.userDesire,
+      user_importance: story.userImportance,
+      current_problem: story.currentProblem,
+      main_steps: story.mainSteps,
+      alternative_flows: story.alternativeFlows,
+      business_rules: story.businessRules,
+      validations: story.validations,
+      acceptance_criteria: story.acceptanceCriteria,
+      dependencies: story.dependencies,
+      technical_risks: story.technicalRisks,
+      requires_spike: story.requiresSpike,
+      additional_comments: story.additionalComments,
+      status: story.status,
+    });
+    const newStory = convertDbUserStory(dbStory);
+    setUserStories(prev => [...prev, newStory]);
+    return newStory;
   };
 
   const updateUserStory = async (id: string, updates: Partial<UserStoryData>) => {
-    try {
-      const dbUpdates: Database['public']['Tables']['user_stories']['Update'] = {
-        project_id: updates.projectId || null,
-        date: updates.date,
-        author: updates.author,
-        user_persona: updates.userPersona,
-        user_role: updates.userRole,
-        user_constraints: updates.userConstraints,
-        user_desire: updates.userDesire,
-        user_importance: updates.userImportance,
-        current_problem: updates.currentProblem,
-        main_steps: updates.mainSteps,
-        alternative_flows: updates.alternativeFlows,
-        business_rules: updates.businessRules,
-        validations: updates.validations,
-        acceptance_criteria: updates.acceptanceCriteria,
-        dependencies: updates.dependencies,
-        technical_risks: updates.technicalRisks,
-        requires_spike: updates.requiresSpike,
-        additional_comments: updates.additionalComments,
-        status: updates.status,
-      };
-      const dbStory = await db.updateUserStory(id, dbUpdates);
-      const updatedStory = convertDbUserStory(dbStory);
-      setUserStories(prev => prev.map(story => story.id === id ? updatedStory : story));
-      return updatedStory;
-    } catch (error) {
-      console.error('Error updating user story:', error);
-      // Fallback to localStorage
-      const updatedStory = userStories.find(s => s.id === id);
-      if (!updatedStory) throw new Error('User story not found');
-      
-      const newStory = { ...updatedStory, ...updates };
-      setUserStories(prev => {
-        const updated = prev.map(story => story.id === id ? newStory : story);
-        localStorage.setItem('userStories', JSON.stringify(updated));
-        return updated;
-      });
-      return newStory;
-    }
+    const dbUpdates: Database['public']['Tables']['user_stories']['Update'] = {
+      project_id: updates.projectId || null,
+      date: updates.date,
+      author: updates.author,
+      user_persona: updates.userPersona,
+      user_role: updates.userRole,
+      user_constraints: updates.userConstraints,
+      user_desire: updates.userDesire,
+      user_importance: updates.userImportance,
+      current_problem: updates.currentProblem,
+      main_steps: updates.mainSteps,
+      alternative_flows: updates.alternativeFlows,
+      business_rules: updates.businessRules,
+      validations: updates.validations,
+      acceptance_criteria: updates.acceptanceCriteria,
+      dependencies: updates.dependencies,
+      technical_risks: updates.technicalRisks,
+      requires_spike: updates.requiresSpike,
+      additional_comments: updates.additionalComments,
+      status: updates.status,
+    };
+    const dbStory = await db.updateUserStory(id, dbUpdates);
+    const updatedStory = convertDbUserStory(dbStory);
+    setUserStories(prev => prev.map(story => story.id === id ? updatedStory : story));
+    return updatedStory;
   };
 
   const deleteUserStory = async (id: string) => {
-    try {
-      await db.deleteUserStory(id);
-      setUserStories(prev => prev.filter(story => story.id !== id));
-    } catch (error) {
-      console.error('Error deleting user story:', error);
-      // Fallback to localStorage
-      setUserStories(prev => {
-        const updated = prev.filter(story => story.id !== id);
-        localStorage.setItem('userStories', JSON.stringify(updated));
-        return updated;
-      });
-    }
+    await db.deleteUserStory(id);
+    setUserStories(prev => prev.filter(story => story.id !== id));
   };
 
   return {

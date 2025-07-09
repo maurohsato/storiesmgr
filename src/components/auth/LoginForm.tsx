@@ -186,46 +186,22 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
           )}
         </form>
 
-        {/* Demo accounts info */}
+        {/* System status info */}
         {!requiresMFA && (
-          <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h3 className="text-sm font-medium text-blue-900 mb-2">
-              Contas de Demonstração (Fallback):
+          <div className="mt-8 p-4 bg-green-50 rounded-lg border border-green-200">
+            <h3 className="text-sm font-medium text-green-900 mb-2">
+              ✅ Sistema Conectado ao Supabase
             </h3>
-            <div className="text-xs text-blue-800 space-y-2">
-              <div className="p-2 bg-green-50 rounded border border-green-200">
-                <p className="text-green-800 font-medium">
-                  ✅ Sistema conectado ao Supabase
-                </p>
-                <p className="text-green-700 text-xs">
-                  Dados salvos no banco de dados em tempo real
-                </p>
-              </div>
-              <div className="p-2 bg-white rounded border border-blue-100">
-                <div><strong>👑 Administrador:</strong> admin@demo.com</div>
-                <div className="text-blue-600">Senha: demo123</div>
-                <div className="text-blue-500 text-xs">• Acesso total ao sistema</div>
-              </div>
-              <div className="p-2 bg-white rounded border border-blue-100">
-                <div><strong>👨‍💼 Gerente:</strong> manager@demo.com</div>
-                <div className="text-blue-600">Senha: demo123</div>
-                <div className="text-blue-500 text-xs">• Gerencia projetos, times e clientes</div>
-              </div>
-              <div className="p-2 bg-white rounded border border-blue-100">
-                <div><strong>✏️ Colaborador:</strong> collab@demo.com</div>
-                <div className="text-blue-600">Senha: demo123</div>
-                <div className="text-blue-500 text-xs">• Cria e edita histórias de usuário</div>
-              </div>
-              <div className="p-2 bg-white rounded border border-blue-100">
-                <div><strong>👁️ Leitor:</strong> reader@demo.com</div>
-                <div className="text-blue-600">Senha: demo123</div>
-                <div className="text-blue-500 text-xs">• Apenas visualização</div>
-              </div>
+            <div className="text-xs text-green-800 space-y-1">
+              <p>• Autenticação em tempo real</p>
+              <p>• Dados salvos no banco PostgreSQL</p>
+              <p>• Row Level Security (RLS) ativo</p>
+              <p>• Sessões com timeout de 5 minutos</p>
             </div>
-            <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
-              <p className="text-xs text-yellow-800">
-                <strong>🔐 MFA (Demonstração):</strong> Configure 2FA no menu do usuário. 
-                Use qualquer código de 6 dígitos (ex: 123456) para testar.
+            <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
+              <p className="text-xs text-blue-800">
+                <strong>🔐 MFA Disponível:</strong> Configure autenticação de dois fatores 
+                no menu do usuário após fazer login.
               </p>
             </div>
           </div>

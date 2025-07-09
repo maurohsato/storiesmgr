@@ -34,74 +34,10 @@ export const useAuth = () => {
   return context;
 };
 
-// Demo users for local development
-const DEMO_USERS = [
-  {
-    id: '1',
-    email: 'admin@demo.com',
-    password: 'demo123',
-    profile: {
-      id: '1',
-      email: 'admin@demo.com',
-      full_name: 'Administrador Demo',
-      role: 'admin' as const,
-      avatar_url: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    mfaSecret: 'JBSWY3DPEHPK3PXP'
-  },
-  {
-    id: '2',
-    email: 'manager@demo.com',
-    password: 'demo123',
-    profile: {
-      id: '2',
-      email: 'manager@demo.com',
-      full_name: 'Gerente Demo',
-      role: 'project_manager' as const,
-      avatar_url: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    mfaSecret: 'JBSWY3DPEHPK3PXQ'
-  },
-  {
-    id: '3',
-    email: 'collab@demo.com',
-    password: 'demo123',
-    profile: {
-      id: '3',
-      email: 'collab@demo.com',
-      full_name: 'Colaborador Demo',
-      role: 'collaborator' as const,
-      avatar_url: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    mfaSecret: 'JBSWY3DPEHPK3PXR'
-  },
-  {
-    id: '4',
-    email: 'reader@demo.com',
-    password: 'demo123',
-    profile: {
-      id: '4',
-      email: 'reader@demo.com',
-      full_name: 'Leitor Demo',
-      role: 'reader' as const,
-      avatar_url: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    mfaSecret: 'JBSWY3DPEHPK3PXS'
-  }
-];
-
 // Session management constants
 const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
-const SESSION_KEY = 'demo_session';
-const LAST_ACTIVITY_KEY = 'demo_last_activity';
+const SESSION_KEY = 'supabase_session';
+const LAST_ACTIVITY_KEY = 'supabase_last_activity';
 
 interface SessionData {
   user: User;
@@ -113,21 +49,16 @@ interface SessionData {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [mfaEnabled, setMfaEnabled] = useState(false);
 
   // Initialize auth state
   useEffect(() => {
-    setLoading(true);
-    
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
         loadUserProfile(session.user.id);
-      } else {
-        // Fallback to demo mode if no Supabase session
-        loadDemoSession();
       }
       setLoading(false);
     });
@@ -142,6 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(null);
           setProfile(null);
           setMfaEnabled(false);
+          clearSession();
         }
       }
     );
@@ -158,34 +90,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Check if MFA is enabled for this user
         const mfaStatus = localStorage.getItem(`supabase_mfa_${userId}`) === 'true';
         setMfaEnabled(mfaStatus);
+        
+        // Save session data for idle timeout management
+        saveSession({
+          id: userId,
+          email: profile.email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as User, profile, mfaStatus);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
-    }
-  };
-
-  // Load demo session (fallback)
-  const loadDemoSession = () => {
-    const sessionData = localStorage.getItem(SESSION_KEY);
-    
-    if (!sessionData) {
-      return;
-    }
-
-    if (!isSessionValid()) {
-      clearSession();
-      return;
-    }
-
-    try {
-      const session: SessionData = JSON.parse(sessionData);
-      setUser(session.user);
-      setProfile(session.profile);
-      setMfaEnabled(session.mfaEnabled);
-      updateLastActivity();
-    } catch (error) {
-      console.error('Error loading demo session:', error);
-      clearSession();
     }
   };
 
@@ -218,45 +133,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
   };
 
-  // Load session if valid
-  const loadSession = (): boolean => {
-    try {
-      const sessionData = localStorage.getItem(SESSION_KEY);
-      
-      if (!sessionData) {
-        return false;
-      }
-
-      // Check if session is still valid (not expired due to inactivity)
-      if (!isSessionValid()) {
-        clearSession();
-        return false;
-      }
-
-      const session: SessionData = JSON.parse(sessionData);
-      
-      // Session is valid, restore state and update activity
-      setUser(session.user);
-      setProfile(session.profile);
-      setMfaEnabled(session.mfaEnabled);
-      updateLastActivity();
-      
-      return true;
-    } catch (error) {
-      console.error('Error loading session:', error);
-      clearSession();
-      return false;
-    }
-  };
-
   // Clear session data
   const clearSession = () => {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(LAST_ACTIVITY_KEY);
-    // Keep old keys for backward compatibility cleanup
-    localStorage.removeItem('demo_user');
-    localStorage.removeItem('demo_profile');
-    localStorage.removeItem('demo_mfa_enabled');
   };
 
   // Auto logout when session expires due to inactivity
@@ -266,10 +146,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const checkSessionExpiry = () => {
       if (!isSessionValid()) {
         // Session expired due to inactivity, logout user
-        setUser(null);
-        setProfile(null);
-        setMfaEnabled(false);
-        clearSession();
+        signOut();
         alert('Sua sessão expirou por inatividade. Faça login novamente.');
       }
     };
@@ -282,7 +159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Track user activity to extend session
   useEffect(() => {
-    if (!user) return;
+    if (!user || !profile) return;
 
     const handleUserActivity = () => {
       if (user && profile && isSessionValid()) {
@@ -328,49 +205,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [user, profile, mfaEnabled]);
 
-  useEffect(() => {
-    // Check for existing valid session on app start
-    const checkExistingSession = () => {
-      const hasValidSession = loadSession();
-      
-      if (!hasValidSession) {
-        // No valid session, start fresh
-        setUser(null);
-        setProfile(null);
-        setMfaEnabled(false);
-      }
-      
-      setLoading(false);
-    };
-
-    checkExistingSession();
-  }, []);
-
   const signIn = async (email: string, password: string, mfaCode?: string) => {
-    try {
-      // Try Supabase authentication first
-      const { data, error } = await auth.signIn(email, password);
-      
-      if (error) throw error;
-      
-      if (data.user) {
-        // Supabase authentication successful
-        setUser(data.user);
-        await loadUserProfile(data.user.id);
-        return;
-      }
-    } catch (error) {
-      console.log('Supabase auth failed, trying demo mode:', error);
-      
-      // Fallback to demo authentication
-      const demoUser = DEMO_USERS.find(u => u.email === email && u.password === password);
-      
-      if (!demoUser) {
-        throw new Error('Credenciais inválidas. Use uma das contas de demonstração.');
-      }
-
+    const { data, error } = await auth.signIn(email, password);
+    
+    if (error) throw error;
+    
+    if (data.user) {
       // Check if MFA is enabled for this user
-      const userMfaEnabled = localStorage.getItem(`demo_mfa_${demoUser.id}`) === 'true';
+      const userMfaEnabled = localStorage.getItem(`supabase_mfa_${data.user.id}`) === 'true';
       
       if (userMfaEnabled) {
         if (!mfaCode) {
@@ -383,73 +225,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      const mockUser = {
-        id: demoUser.id,
-        email: demoUser.email,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as User;
-
-      setUser(mockUser);
-      setProfile(demoUser.profile);
-      setMfaEnabled(userMfaEnabled);
-      
-      // Save session with current timestamp
-      saveSession(mockUser, demoUser.profile, userMfaEnabled);
+      setUser(data.user);
+      await loadUserProfile(data.user.id);
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    try {
-      // Try Supabase registration first
-      const { data, error } = await auth.signUp(email, password, fullName);
-      
-      if (error) throw error;
-      
-      if (data.user) {
-        // Registration successful, user needs to verify email
-        return;
-      }
-    } catch (error) {
-      console.log('Supabase signup failed, using demo mode:', error);
-      
-      // Fallback to demo registration
-      const newId = Date.now().toString();
-      const mockUser = {
-        id: newId,
-        email,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as User;
-
-      const newProfile: Profile = {
-        id: newId,
-        email,
-        full_name: fullName,
-        role: 'reader',
-        avatar_url: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      setUser(mockUser);
-      setProfile(newProfile);
-      setMfaEnabled(false);
-      
-      // Save session with current timestamp
-      saveSession(mockUser, newProfile, false);
+    const { data, error } = await auth.signUp(email, password, fullName);
+    
+    if (error) throw error;
+    
+    if (data.user) {
+      // Registration successful, user needs to verify email
+      return;
     }
   };
 
   const signOut = async () => {
-    try {
-      // Try Supabase signout first
-      await auth.signOut();
-    } catch (error) {
-      console.log('Supabase signout failed:', error);
-    }
-    
-    // Always clear local state
+    await auth.signOut();
     setUser(null);
     setProfile(null);
     setMfaEnabled(false);
@@ -459,40 +252,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!profile || !user) throw new Error('No user logged in');
     
-    try {
-      // Try updating in Supabase first
-      const updatedProfile = await auth.updateProfile(user.id, updates);
-      setProfile(updatedProfile);
-    } catch (error) {
-      console.log('Supabase profile update failed, using local update:', error);
-      
-      // Fallback to local update
-      const updatedProfile = { ...profile, ...updates };
-      setProfile(updatedProfile);
-      
-      // Update session with new profile data
-      saveSession(user, updatedProfile, mfaEnabled);
-    }
+    const updatedProfile = await auth.updateProfile(user.id, updates);
+    setProfile(updatedProfile);
+    
+    // Update session with new profile data
+    saveSession(user, updatedProfile, mfaEnabled);
   };
 
   const enableMFA = async () => {
     if (!user) throw new Error('No user logged in');
     
-    // For demo purposes, use demo user secret or generate one
-    const demoUser = DEMO_USERS.find(u => u.id === user.id);
-    const secret = demoUser?.mfaSecret || 'JBSWY3DPEHPK3PXP';
-    const qrCode = `otpauth://totp/UserStories:${user.email}?secret=${secret}&issuer=UserStories`;
-    
-    return { secret, qrCode };
-  };
-
-  const enableMFA = async () => {
-    if (!user) throw new Error('No user logged in');
-    
-    const demoUser = DEMO_USERS.find(u => u.id === user.id);
-    if (!demoUser) throw new Error('User not found');
-    
-    const secret = demoUser.mfaSecret;
+    // Generate a unique secret for this user
+    const secret = `JBSWY3DPEHPK3PX${user.id.slice(-1).toUpperCase()}`;
     const qrCode = `otpauth://totp/UserStories:${user.email}?secret=${secret}&issuer=UserStories`;
     
     return { secret, qrCode };
@@ -505,7 +276,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isValid = /^\d{6}$/.test(code);
     
     if (isValid) {
-      localStorage.setItem(`demo_mfa_${user.id}`, 'true');
+      localStorage.setItem(`supabase_mfa_${user.id}`, 'true');
       setMfaEnabled(true);
       
       // Update session with MFA enabled
@@ -525,7 +296,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error('Código MFA inválido');
     }
     
-    localStorage.removeItem(`demo_mfa_${user.id}`);
+    localStorage.removeItem(`supabase_mfa_${user.id}`);
     setMfaEnabled(false);
     
     // Update session with MFA disabled

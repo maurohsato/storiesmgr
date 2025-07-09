@@ -15,61 +15,22 @@ const UserManagement: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentProfile?.role === 'admin') {
       loadProfiles();
     }
-  }, []);
+  }, [currentProfile]);
 
   const loadProfiles = async () => {
     try {
-      // Try to load from Supabase first
+      setError(null);
       const data = await db.getProfiles();
       setProfiles(data);
     } catch (error) {
       console.error('Error loading profiles:', error);
-      
-      // Fallback to demo profiles
-      const mockProfiles: Profile[] = [
-        {
-          id: '1',
-          email: 'admin@demo.com',
-          full_name: 'Administrador Demo',
-          role: 'admin',
-          avatar_url: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          email: 'manager@demo.com',
-          full_name: 'Gerente Demo',
-          role: 'project_manager',
-          avatar_url: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: '3',
-          email: 'collab@demo.com',
-          full_name: 'Colaborador Demo',
-          role: 'collaborator',
-          avatar_url: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: '4',
-          email: 'reader@demo.com',
-          full_name: 'Leitor Demo',
-          role: 'reader',
-          avatar_url: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
-      ];
-      setProfiles(mockProfiles);
+      setError('Erro ao carregar usuários. Verifique sua conexão.');
     } finally {
       setLoading(false);
     }
@@ -88,7 +49,6 @@ const UserManagement: React.FC = () => {
 
     setUpdating(true);
     try {
-      // Try updating in Supabase first
       await db.updateProfile(userId, { role: newRole });
       
       // Update local state
@@ -100,13 +60,7 @@ const UserManagement: React.FC = () => {
       alert('Role atualizado com sucesso!');
     } catch (error) {
       console.error('Error updating role:', error);
-      
-      // Fallback to local update for demo
-      setProfiles(prev => prev.map(p => 
-        p.id === userId ? { ...p, role: newRole } : p
-      ));
-      setEditingUser(null);
-      alert('Role atualizado com sucesso! (Modo demonstração)');
+      alert('Erro ao atualizar role do usuário. Tente novamente.');
     } finally {
       setUpdating(false);
     }
@@ -143,6 +97,25 @@ const UserManagement: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8">
+        <div className="text-center py-12">
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <h3 className="text-lg font-medium text-red-900 mb-2">Erro ao carregar dados</h3>
+            <p className="text-red-700">{error}</p>
+            <button
+              onClick={loadProfiles}
+              className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
