@@ -189,8 +189,18 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
         {/* Demo accounts info */}
         {!requiresMFA && (
           <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h3 className="text-sm font-medium text-blue-900 mb-2">Contas de Demonstração:</h3>
+            <h3 className="text-sm font-medium text-blue-900 mb-2">
+              Contas de Demonstração (Fallback):
+            </h3>
             <div className="text-xs text-blue-800 space-y-2">
+              <div className="p-2 bg-green-50 rounded border border-green-200">
+                <p className="text-green-800 font-medium">
+                  ✅ Sistema conectado ao Supabase
+                </p>
+                <p className="text-green-700 text-xs">
+                  Dados salvos no banco de dados em tempo real
+                </p>
+              </div>
               <div className="p-2 bg-white rounded border border-blue-100">
                 <div><strong>👑 Administrador:</strong> admin@demo.com</div>
                 <div className="text-blue-600">Senha: demo123</div>

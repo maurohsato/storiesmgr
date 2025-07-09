@@ -57,6 +57,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <span className="ml-3 text-xl font-bold bg-gradient-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent">
                   User Stories Manager
                 </span>
+                <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                  Supabase
+                </span>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 {navigation.map((item) => {

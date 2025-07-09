@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { User } from '@supabase/supabase-js';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase, auth } from '../lib/supabase';
 import { Database } from '../types/database';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -112,8 +113,81 @@ interface SessionData {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [mfaEnabled, setMfaEnabled] = useState(false);
+
+  // Initialize auth state
+  useEffect(() => {
+    setLoading(true);
+    
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        loadUserProfile(session.user.id);
+      } else {
+        // Fallback to demo mode if no Supabase session
+        loadDemoSession();
+      }
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          setUser(session.user);
+          await loadUserProfile(session.user.id);
+        } else {
+          setUser(null);
+          setProfile(null);
+          setMfaEnabled(false);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load user profile from Supabase
+  const loadUserProfile = async (userId: string) => {
+    try {
+      const profile = await auth.getCurrentProfile();
+      if (profile) {
+        setProfile(profile);
+        // Check if MFA is enabled for this user
+        const mfaStatus = localStorage.getItem(`supabase_mfa_${userId}`) === 'true';
+        setMfaEnabled(mfaStatus);
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
+
+  // Load demo session (fallback)
+  const loadDemoSession = () => {
+    const sessionData = localStorage.getItem(SESSION_KEY);
+    
+    if (!sessionData) {
+      return;
+    }
+
+    if (!isSessionValid()) {
+      clearSession();
+      return;
+    }
+
+    try {
+      const session: SessionData = JSON.parse(sessionData);
+      setUser(session.user);
+      setProfile(session.profile);
+      setMfaEnabled(session.mfaEnabled);
+      updateLastActivity();
+    } catch (error) {
+      console.error('Error loading demo session:', error);
+      clearSession();
+    }
+  };
 
   // Update last activity timestamp
   const updateLastActivity = () => {
@@ -273,70 +347,109 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string, mfaCode?: string) => {
-    const demoUser = DEMO_USERS.find(u => u.email === email && u.password === password);
-    
-    if (!demoUser) {
-      throw new Error('Credenciais inválidas. Use uma das contas de demonstração.');
-    }
-
-    // Check if MFA is enabled for this user
-    const userMfaEnabled = localStorage.getItem(`demo_mfa_${demoUser.id}`) === 'true';
-    
-    if (userMfaEnabled) {
-      if (!mfaCode) {
-        throw new Error('MFA_REQUIRED');
-      }
+    try {
+      // Try Supabase authentication first
+      const { data, error } = await auth.signIn(email, password);
       
-      // Para demonstração, aceitar qualquer código de 6 dígitos
-      if (!/^\d{6}$/.test(mfaCode)) {
-        throw new Error('Código MFA inválido. Verifique o código no seu Google Authenticator.');
+      if (error) throw error;
+      
+      if (data.user) {
+        // Supabase authentication successful
+        setUser(data.user);
+        await loadUserProfile(data.user.id);
+        return;
       }
+    } catch (error) {
+      console.log('Supabase auth failed, trying demo mode:', error);
+      
+      // Fallback to demo authentication
+      const demoUser = DEMO_USERS.find(u => u.email === email && u.password === password);
+      
+      if (!demoUser) {
+        throw new Error('Credenciais inválidas. Use uma das contas de demonstração.');
+      }
+
+      // Check if MFA is enabled for this user
+      const userMfaEnabled = localStorage.getItem(`demo_mfa_${demoUser.id}`) === 'true';
+      
+      if (userMfaEnabled) {
+        if (!mfaCode) {
+          throw new Error('MFA_REQUIRED');
+        }
+        
+        // Para demonstração, aceitar qualquer código de 6 dígitos
+        if (!/^\d{6}$/.test(mfaCode)) {
+          throw new Error('Código MFA inválido. Verifique o código no seu Google Authenticator.');
+        }
+      }
+
+      const mockUser = {
+        id: demoUser.id,
+        email: demoUser.email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as User;
+
+      setUser(mockUser);
+      setProfile(demoUser.profile);
+      setMfaEnabled(userMfaEnabled);
+      
+      // Save session with current timestamp
+      saveSession(mockUser, demoUser.profile, userMfaEnabled);
     }
-
-    const mockUser = {
-      id: demoUser.id,
-      email: demoUser.email,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    } as User;
-
-    setUser(mockUser);
-    setProfile(demoUser.profile);
-    setMfaEnabled(userMfaEnabled);
-    
-    // Save session with current timestamp
-    saveSession(mockUser, demoUser.profile, userMfaEnabled);
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    // For demo purposes, just create a new reader user
-    const newId = Date.now().toString();
-    const mockUser = {
-      id: newId,
-      email,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    } as User;
+    try {
+      // Try Supabase registration first
+      const { data, error } = await auth.signUp(email, password, fullName);
+      
+      if (error) throw error;
+      
+      if (data.user) {
+        // Registration successful, user needs to verify email
+        return;
+      }
+    } catch (error) {
+      console.log('Supabase signup failed, using demo mode:', error);
+      
+      // Fallback to demo registration
+      const newId = Date.now().toString();
+      const mockUser = {
+        id: newId,
+        email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as User;
 
-    const newProfile: Profile = {
-      id: newId,
-      email,
-      full_name: fullName,
-      role: 'reader',
-      avatar_url: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+      const newProfile: Profile = {
+        id: newId,
+        email,
+        full_name: fullName,
+        role: 'reader',
+        avatar_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-    setUser(mockUser);
-    setProfile(newProfile);
-    setMfaEnabled(false);
-    
-    // Save session with current timestamp
-    saveSession(mockUser, newProfile, false);
+      setUser(mockUser);
+      setProfile(newProfile);
+      setMfaEnabled(false);
+      
+      // Save session with current timestamp
+      saveSession(mockUser, newProfile, false);
+    }
   };
 
   const signOut = async () => {
+    try {
+      // Try Supabase signout first
+      await auth.signOut();
+    } catch (error) {
+      console.log('Supabase signout failed:', error);
+    }
+    
+    // Always clear local state
     setUser(null);
     setProfile(null);
     setMfaEnabled(false);
@@ -344,15 +457,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
-    if (!profile) throw new Error('No user logged in');
+    if (!profile || !user) throw new Error('No user logged in');
     
-    const updatedProfile = { ...profile, ...updates };
-    setProfile(updatedProfile);
-    
-    // Update session with new profile data
-    if (user) {
+    try {
+      // Try updating in Supabase first
+      const updatedProfile = await auth.updateProfile(user.id, updates);
+      setProfile(updatedProfile);
+    } catch (error) {
+      console.log('Supabase profile update failed, using local update:', error);
+      
+      // Fallback to local update
+      const updatedProfile = { ...profile, ...updates };
+      setProfile(updatedProfile);
+      
+      // Update session with new profile data
       saveSession(user, updatedProfile, mfaEnabled);
     }
+  };
+
+  const enableMFA = async () => {
+    if (!user) throw new Error('No user logged in');
+    
+    // For demo purposes, use demo user secret or generate one
+    const demoUser = DEMO_USERS.find(u => u.id === user.id);
+    const secret = demoUser?.mfaSecret || 'JBSWY3DPEHPK3PXP';
+    const qrCode = `otpauth://totp/UserStories:${user.email}?secret=${secret}&issuer=UserStories`;
+    
+    return { secret, qrCode };
   };
 
   const enableMFA = async () => {

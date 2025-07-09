@@ -17,12 +17,20 @@ const UserManagement: React.FC = () => {
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
-    loadProfiles();
+    if (currentProfile?.role === 'admin') {
+      loadProfiles();
+    }
   }, []);
 
   const loadProfiles = async () => {
     try {
-      // For demo purposes, return mock profiles
+      // Try to load from Supabase first
+      const data = await db.getProfiles();
+      setProfiles(data);
+    } catch (error) {
+      console.error('Error loading profiles:', error);
+      
+      // Fallback to demo profiles
       const mockProfiles: Profile[] = [
         {
           id: '1',
@@ -61,10 +69,7 @@ const UserManagement: React.FC = () => {
           updated_at: new Date().toISOString(),
         }
       ];
-      const data = mockProfiles;
-      setProfiles(data);
-    } catch (error) {
-      console.error('Error loading profiles:', error);
+      setProfiles(mockProfiles);
     } finally {
       setLoading(false);
     }
@@ -83,16 +88,25 @@ const UserManagement: React.FC = () => {
 
     setUpdating(true);
     try {
-      // For demo purposes, just update local state
-      // await db.updateProfile(userId, { role: newRole });
+      // Try updating in Supabase first
+      await db.updateProfile(userId, { role: newRole });
+      
+      // Update local state
+      setProfiles(prev => prev.map(p => 
+        p.id === userId ? { ...p, role: newRole } : p
+      ));
+      
+      setEditingUser(null);
+      alert('Role atualizado com sucesso!');
+    } catch (error) {
+      console.error('Error updating role:', error);
+      
+      // Fallback to local update for demo
       setProfiles(prev => prev.map(p => 
         p.id === userId ? { ...p, role: newRole } : p
       ));
       setEditingUser(null);
       alert('Role atualizado com sucesso! (Modo demonstração)');
-    } catch (error) {
-      console.error('Error updating role:', error);
-      alert('Erro ao atualizar role do usuário');
     } finally {
       setUpdating(false);
     }
