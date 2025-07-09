@@ -139,39 +139,8 @@ const UserStoryForm: React.FC = () => {
       if (projectId && !isEditing) {
         navigate(`/projects/${projectId}`);
       } else {
-        navigate('/stories');
-      }
-    } catch (error) {
-      console.error('Error saving story:', error);
-      alert('Erro ao salvar história. Tente novamente.');
-      setIsSubmitting(false);
-    }
-  };
 
-  const handleExportPDF = () => {
-    if (!formData.projectId) {
-      alert('Por favor, selecione um projeto antes de exportar.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const storyData: UserStoryData = {
-        ...formData,
-        createdAt: isEditing ? userStories.find(s => s.id === id)?.createdAt || new Date().toISOString() : new Date().toISOString(),
-      };
-      generateUserStoryPDF(storyData);
-      setTimeout(() => {
-        setIsSubmitting(false);
-      }, 1000);
-    } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
-      setIsSubmitting(false);
-      alert(`Erro ao gerar PDF: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-    }
-  };
-
-  const handleSendToBacklog = () => {
+  const handleSendToBacklog = async () => {
     if (!formData.projectId) {
       alert('Por favor, selecione um projeto antes de enviar para o backlog.');
       return;
