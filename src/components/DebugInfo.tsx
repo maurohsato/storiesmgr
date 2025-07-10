@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Bug, Eye, EyeOff } from 'lucide-react';
 
 const DebugInfo: React.FC = () => {
-  const { user, profile, loading, mfaEnabled } = useAuth();
+  const { user, profile, loading } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
 
   if (process.env.NODE_ENV === 'production') {
@@ -24,11 +24,9 @@ const DebugInfo: React.FC = () => {
       created_at: profile.created_at,
     } : null,
     loading,
-    mfaEnabled,
     localStorage: {
       session: !!localStorage.getItem('supabase_session'),
       lastActivity: localStorage.getItem('supabase_last_activity'),
-      mfaKeys: Object.keys(localStorage).filter(key => key.includes('mfa')),
     },
     timestamp: new Date().toISOString(),
   };

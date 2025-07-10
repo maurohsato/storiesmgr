@@ -2,8 +2,6 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, auth } from '../lib/supabase';
 import { Database } from '../types/database';
-import { authenticator } from 'otplib';
-import QRCode from 'qrcode';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -11,15 +9,11 @@ interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
-  mfaEnabled: boolean;
-  signIn: (email: string, password: string, mfaCode?: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
-  enableMFA: () => Promise<{ secret: string; qrCode: string; manualEntryKey: string }>;
-  verifyMFA: (code: string) => Promise<boolean>;
-  disableMFA: (code: string) => Promise<void>;
   hasRole: (roles: Profile['role'] | Profile['role'][]) => boolean;
   canManageUsers: () => boolean;
   canManageContent: () => boolean;
@@ -45,7 +39,6 @@ const LAST_ACTIVITY_KEY = 'supabase_last_activity';
 interface SessionData {
   user: User;
   profile: Profile;
-  mfaEnabled: boolean;
   lastActivity: number;
 }
 
@@ -53,7 +46,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mfaEnabled, setMfaEnabled] = useState(false);
 
   // Force clear any invalid sessions on app start
   useEffect(() => {
@@ -62,13 +54,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // Clear all local storage related to auth
       clearSession();
-      
-      // Clear any MFA data that might be orphaned
-      Object.keys(localStorage).forEach(key => {
-        if (key.includes('supabase_mfa') || key.includes('temp_mfa')) {
-          localStorage.removeItem(key);
-        }
-      });
       
       console.log('✅ Sessões limpas - usuário deve fazer login');
     };
@@ -122,7 +107,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.log('🚪 Usuário deslogado');
           setUser(null);
           setProfile(null);
-          setMfaEnabled(false);
           clearSession();
         } else if (event === 'SIGNED_IN' && session?.user) {
           console.log('🔐 Usuário logado via evento:', session.user.email);
@@ -158,17 +142,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('✅ Perfil carregado:', profile.email, 'Role:', profile.role);
         setProfile(profile);
         
-        // Check if MFA is enabled for this user
-        const mfaStatus = localStorage.getItem(`supabase_mfa_${userId}`) === 'true';
-        setMfaEnabled(mfaStatus);
-        
         // Save session data
         saveSession({
           id: userId,
           email: profile.email,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        } as User, profile, mfaStatus);
+        } as User, profile);
       }
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
@@ -192,12 +172,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Save session with current timestamp
-  const saveSession = (userData: User, profileData: Profile, mfaEnabledData: boolean) => {
+  const saveSession = (userData: User, profileData: Profile) => {
     const now = updateLastActivity();
     const sessionData: SessionData = {
       user: userData,
       profile: profileData,
-      mfaEnabled: mfaEnabledData,
       lastActivity: now
     };
     
@@ -234,7 +213,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const handleUserActivity = () => {
       if (user && profile && isSessionValid()) {
-        saveSession(user, profile, mfaEnabled);
+        saveSession(user, profile);
       }
     };
 
@@ -262,45 +241,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         clearTimeout(throttleTimeout);
       }
     };
-  }, [user, profile, mfaEnabled]);
+  }, [user, profile]);
 
-  const signIn = async (email: string, password: string, mfaCode?: string) => {
+  const signIn = async (email: string, password: string) => {
     try {
       console.log('🔐 Tentando fazer login para:', email);
       
-      // Verificar se MFA está configurado para este usuário
-      const userMfaEnabled = localStorage.getItem(`supabase_mfa_${email}`) === 'true';
-      
-      if (!userMfaEnabled) {
-        // MFA não configurado - usuário precisa configurar primeiro
-        throw new Error('MFA_SETUP_REQUIRED');
-      }
-      
-      if (!mfaCode) {
-        // MFA configurado mas código não fornecido
-        throw new Error('MFA_REQUIRED');
-      }
-      
-      // Verificar código MFA primeiro
-      const savedSecret = localStorage.getItem(`supabase_mfa_secret_${email}`);
-      
-      if (!savedSecret) {
-        throw new Error('MFA não configurado corretamente. Configure novamente.');
-      }
-      
-      // Verificação real do código MFA usando otplib
-      const isValidMFA = authenticator.verify({
-        token: mfaCode,
-        secret: savedSecret
-      });
-      
-      if (!isValidMFA) {
-        throw new Error('Código MFA inválido. Verifique o código no Google Authenticator.');
-      }
-      
-      console.log('✅ MFA verificado com sucesso');
-      
-      // Agora fazer login no Supabase
+      // Fazer login no Supabase diretamente
       const { data, error } = await auth.signIn(email, password);
       
       if (error) {
@@ -315,15 +262,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       if (data.user) {
-        console.log('✅ Login completo bem-sucedido para:', email);
-        
-        // Set MFA as enabled
-        localStorage.setItem(`supabase_mfa_${data.user.id}`, 'true');
-        setMfaEnabled(true);
-
+        console.log('✅ Login bem-sucedido para:', email);
         setUser(data.user);
         await loadUserProfile(data.user.id);
-        
         console.log('✅ Usuário e perfil carregados com sucesso');
       }
     } catch (error: any) {
@@ -364,7 +305,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await auth.signOut();
     setUser(null);
     setProfile(null);
-    setMfaEnabled(false);
     clearSession();
   };
 
@@ -381,7 +321,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
 
     setProfile(updatedProfile);
-    saveSession(user, updatedProfile, mfaEnabled);
+    saveSession(user, updatedProfile);
     
     return updatedProfile;
   };
@@ -409,83 +349,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const enableMFA = async () => {
-    if (!user) throw new Error('No user logged in');
-    
-    const secret = authenticator.generateSecret();
-    
-    const otpAuthUrl = authenticator.keyuri(
-      user.email!,
-      'User Stories Manager',
-      secret
-    );
-    
-    const qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl);
-    
-    localStorage.setItem(`temp_mfa_secret_${user.id}`, secret);
-    
-    return { 
-      secret, 
-      qrCode: qrCodeDataUrl,
-      manualEntryKey: secret.match(/.{1,4}/g)?.join(' ') || secret
-    };
-  };
-
-  const verifyMFA = async (code: string) => {
-    if (!user) throw new Error('No user logged in');
-    
-    const tempSecret = localStorage.getItem(`temp_mfa_secret_${user.id}`);
-    if (!tempSecret) {
-      throw new Error('Secret MFA não encontrado. Inicie o processo novamente.');
-    }
-    
-    const isValid = authenticator.verify({
-      token: code,
-      secret: tempSecret
-    });
-    
-    if (isValid) {
-      localStorage.setItem(`supabase_mfa_${user.id}`, 'true');
-      localStorage.setItem(`supabase_mfa_secret_${user.id}`, tempSecret);
-      localStorage.setItem(`supabase_mfa_secret_${user.email}`, tempSecret);
-      localStorage.removeItem(`temp_mfa_secret_${user.id}`);
-      setMfaEnabled(true);
-      
-      if (profile) {
-        saveSession(user, profile, true);
-      }
-    }
-    
-    return isValid;
-  };
-
-  const disableMFA = async (code: string) => {
-    if (!user) throw new Error('No user logged in');
-    
-    const savedSecret = localStorage.getItem(`supabase_mfa_secret_${user.id}`);
-    if (!savedSecret) {
-      throw new Error('MFA não está configurado');
-    }
-    
-    const isValid = authenticator.verify({
-      token: code,
-      secret: savedSecret
-    });
-    
-    if (!isValid) {
-      throw new Error('Código MFA inválido');
-    }
-    
-    localStorage.removeItem(`supabase_mfa_${user.id}`);
-    localStorage.removeItem(`supabase_mfa_secret_${user.id}`);
-    localStorage.removeItem(`supabase_mfa_secret_${user.email}`);
-    setMfaEnabled(false);
-    
-    if (profile) {
-      saveSession(user, profile, false);
-    }
-  };
-
   // Permission helpers
   const hasRole = (roles: Profile['role'] | Profile['role'][]) => {
     if (!profile) return false;
@@ -502,15 +365,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     profile,
     loading,
-    mfaEnabled,
     signIn,
     signUp,
     signOut,
     updateProfile,
     changePassword,
-    enableMFA,
-    verifyMFA,
-    disableMFA,
     hasRole,
     canManageUsers,
     canManageContent,
