@@ -17,11 +17,17 @@ const UserManagement: React.FC = () => {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Check if current user is admin
+  const isAdmin = currentProfile?.role === 'admin';
+
   useEffect(() => {
-    if (currentProfile?.role === 'admin') {
+    if (isAdmin) {
       loadProfiles();
+    } else {
+      setLoading(false);
+      setError('Apenas administradores podem acessar o gerenciamento de usuários.');
     }
-  }, [currentProfile]);
+  }, [isAdmin]);
 
   const loadProfiles = async () => {
     try {
@@ -37,7 +43,7 @@ const UserManagement: React.FC = () => {
   };
 
   const handleRoleUpdate = async (userId: string, newRole: UserRole) => {
-    if (!currentProfile || currentProfile.role !== 'admin') {
+    if (!isAdmin) {
       alert('Apenas administradores podem alterar roles de usuários');
       return;
     }
@@ -47,6 +53,10 @@ const UserManagement: React.FC = () => {
       return;
     }
 
+    const confirmMessage = `Confirma a alteração do role para "${getRoleLabel(newRole)}"?\n\nEsta ação será registrada no sistema de auditoria.`;
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
     setUpdating(true);
     try {
       await db.updateProfile(userId, { role: newRole });
@@ -58,6 +68,9 @@ const UserManagement: React.FC = () => {
       
       setEditingUser(null);
       alert('Role atualizado com sucesso!');
+      
+      // Reload profiles to get updated data
+      loadProfiles();
     } catch (error) {
       console.error('Error updating role:', error);
       alert('Erro ao atualizar role do usuário. Tente novamente.');
@@ -96,7 +109,23 @@ const UserManagement: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando usuários...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8">
+        <div className="text-center py-12">
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <h3 className="text-lg font-medium text-red-900 mb-2">Acesso Negado</h3>
+            <p className="text-red-700">Apenas administradores podem acessar o gerenciamento de usuários.</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -126,11 +155,23 @@ const UserManagement: React.FC = () => {
         <div className="sm:flex-auto">
           <h1 className="text-2xl font-semibold text-gray-900">Gerenciamento de Usuários</h1>
           <p className="mt-2 text-sm text-gray-700">
-            Gerencie usuários e suas permissões no sistema
+            Gerencie usuários e suas permissões no sistema. Apenas administradores podem alterar roles.
           </p>
         </div>
       </div>
 
+      {/* Admin Info */}
+      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h3 className="text-sm font-medium text-blue-900 mb-2">
+          ℹ️ Informações Importantes
+        </h3>
+        <div className="text-sm text-blue-800 space-y-1">
+          <p>• <strong>admin@demo.com</strong> é automaticamente definido como administrador</p>
+          <p>• Novos usuários são criados com role "Leitor" (sem acesso)</p>
+          <p>• Apenas administradores podem alterar roles de outros usuários</p>
+          <p>• Todas as mudanças de role são registradas para auditoria</p>
+        </div>
+      </div>
       {/* Filters */}
       <div className="mt-6 bg-white p-4 rounded-lg shadow">
         <div className="flex flex-col sm:flex-row gap-4">
@@ -211,8 +252,14 @@ const UserManagement: React.FC = () => {
 
                       {profile.id !== currentProfile?.id && (
                         <div className="mt-4">
+                          {profile.role === 'reader' && (
+                            <div className="mb-2 text-xs text-yellow-700 bg-yellow-50 p-2 rounded">
+                              ⚠️ Usuário sem acesso - precisa de aprovação
+                            </div>
+                          )}
                           <button
                             onClick={() => setEditingUser(profile)}
+                            disabled={updating}
                             className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
                           >
                             <Edit className="h-3 w-3 mr-1" />
@@ -286,6 +333,12 @@ const UserManagement: React.FC = () => {
                   <p><strong>Colaborador:</strong> Criar/editar próprias histórias</p>
                   <p><strong>Gerente:</strong> CRUD completo exceto usuários</p>
                   <p><strong>Admin:</strong> Controle total do sistema</p>
+                  <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                    <p className="text-xs text-yellow-800">
+                      <strong>⚠️ Atenção:</strong> Usuários com role "Leitor" não têm acesso a nenhuma funcionalidade 
+                      até que um administrador altere suas permissões.
+                    </p>
+                  </div>
                 </div>
               </div>
 

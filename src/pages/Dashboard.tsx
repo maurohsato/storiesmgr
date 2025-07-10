@@ -5,6 +5,38 @@ import { Users, Building2, FolderOpen, FileText, Plus, TrendingUp } from 'lucide
 
 const Dashboard: React.FC = () => {
   const { teams, clients, projects, userStories } = useAppContext();
+  const { profile } = useAuth();
+
+  // Show restricted message for readers
+  if (profile?.role === 'reader') {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8">
+        <div className="text-center py-12">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 max-w-2xl mx-auto">
+            <h1 className="text-2xl font-bold text-yellow-900 mb-4">
+              Bem-vindo ao Sistema de Histórias de Usuário
+            </h1>
+            <p className="text-yellow-800 mb-6">
+              Sua conta foi criada com sucesso, mas ainda está aguardando aprovação do administrador.
+            </p>
+            <div className="bg-white border border-yellow-300 rounded-md p-4 text-left">
+              <h3 className="font-medium text-yellow-900 mb-2">📋 Próximos passos:</h3>
+              <ul className="text-sm text-yellow-800 space-y-1">
+                <li>• Entre em contato com <strong>admin@demo.com</strong></li>
+                <li>• Solicite as permissões necessárias para sua função</li>
+                <li>• Aguarde a aprovação da sua conta</li>
+                <li>• Após aprovação, você terá acesso às funcionalidades</li>
+              </ul>
+            </div>
+            <div className="mt-6 text-sm text-yellow-700">
+              <p><strong>Seu perfil atual:</strong> Leitor (Acesso Restrito)</p>
+              <p><strong>Email:</strong> {profile.email}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const stats = [
     {

@@ -199,6 +199,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
               <p>• Dados salvos no banco PostgreSQL</p>
               <p>• Row Level Security (RLS) ativo</p>
               <p>• Sessões com timeout de 5 minutos</p>
+              <p>• <strong>admin@demo.com</strong> tem acesso total</p>
             </div>
             <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
               <p className="text-xs text-blue-800">
@@ -208,9 +209,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
             </div>
             <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
               <p className="text-xs text-yellow-800">
-                <strong>👤 Primeira vez?</strong> Se você não tem uma conta, clique em "Cadastre-se" 
-                para criar uma nova conta. Para administradores: acesse /supabase-validation para 
-                verificar a configuração do sistema.
+                <strong>👤 Controle de Acesso:</strong> Novos usuários são criados com acesso restrito. 
+                Apenas <strong>admin@demo.com</strong> pode conceder permissões. Usuários aguardam aprovação 
+                do administrador para acessar funcionalidades.
               </p>
             </div>
           </div>

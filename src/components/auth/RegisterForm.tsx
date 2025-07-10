@@ -211,8 +211,13 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
 
         <div className="mt-6 p-4 bg-yellow-50 rounded-lg">
           <p className="text-xs text-yellow-800">
-            <strong>Nota:</strong> Novas contas são criadas com perfil de "Leitor" por padrão. 
-            Entre em contato com um administrador para alterar suas permissões.
+            <strong>⚠️ Importante:</strong> Sua conta será criada com acesso restrito (perfil "Leitor"). 
+            Você precisará aguardar que um administrador aprove sua conta e conceda as permissões 
+            necessárias antes de poder acessar as funcionalidades do sistema.
+          </p>
+          <p className="text-xs text-yellow-800 mt-2">
+            <strong>📧 Próximos passos:</strong> Após criar sua conta, entre em contato com 
+            <strong> admin@demo.com</strong> para solicitar as permissões adequadas.
           </p>
         </div>
       </div>

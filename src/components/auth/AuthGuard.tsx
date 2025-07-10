@@ -44,6 +44,36 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
       return <>{fallback}</>;
     }
 
+    // Special message for readers who have no access
+    if (profile.role === 'reader') {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-64 p-8">
+          <div className="text-center">
+            <Shield className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Aguardando Aprovação
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Sua conta foi criada com sucesso, mas ainda não possui permissões para acessar esta funcionalidade.
+            </p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+              <div className="flex">
+                <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" />
+                <div className="text-sm text-yellow-800">
+                  <p><strong>Próximos passos:</strong></p>
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Entre em contato com um administrador</li>
+                    <li>Solicite as permissões necessárias</li>
+                    <li>Aguarde a aprovação da sua conta</li>
+                  </ul>
+                  <p className="mt-3"><strong>Seu perfil atual:</strong> {getRoleLabel(profile.role)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center min-h-64 p-8">
         <div className="text-center">
