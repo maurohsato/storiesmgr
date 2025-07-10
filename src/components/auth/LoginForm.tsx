@@ -314,9 +314,25 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-              {error}
+              <div className="flex items-center">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                <span>{error}</span>
+              </div>
             </div>
           )}
+
+          {/* Debug Info */}
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-xs">
+            <p className="text-blue-800 font-medium mb-1">🔍 Status do Sistema:</p>
+            <div className="text-blue-700 space-y-1">
+              <p>• Modo: {requiresMFA ? 'Verificação MFA' : needsMFASetup ? 'Configuração MFA' : 'Login'}</p>
+              <p>• Email: {email || 'Não informado'}</p>
+              <p>• MFA Configurado: {email && localStorage.getItem(`supabase_mfa_${email}`) === 'true' ? 'Sim' : 'Não'}</p>
+              <p>• Loading: {loading ? 'Sim' : 'Não'}</p>
+              <p>• Política: Login obrigatório a cada sessão</p>
+              <p>• Sessões: Não são restauradas automaticamente</p>
+            </div>
+          </div>
 
           {!requiresMFA ? (
             <div className="space-y-4">
@@ -450,6 +466,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
               <p>• Primeira vez? Configure Google Authenticator</p>
               <p>• Dados protegidos com Row Level Security</p>
               <p>• Sessões expiram em 30 minutos de inatividade</p>
+              <p>• Logout automático se MFA não estiver configurado</p>
+              <p>• <strong>NOVA POLÍTICA:</strong> Login obrigatório a cada acesso</p>
             </div>
             <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
               <div className="flex items-center">
@@ -457,6 +475,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
                 <p className="text-xs text-yellow-800">
                   <strong>Primeira vez?</strong> Você será guiado para configurar o MFA após inserir suas credenciais.
                 </p>
+              </div>
+            </div>
+            <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+              <div className="text-xs text-blue-800">
+                <p><strong>🔍 Debug Info:</strong></p>
+                <p>• Sessões são validadas a cada carregamento</p>
+                <p>• MFA é verificado antes de permitir acesso</p>
+                <p>• Logout automático se sessão inválida</p>
+                <p>• <strong>Todas as sessões são limpas no início</strong></p>
               </div>
             </div>
           </div>

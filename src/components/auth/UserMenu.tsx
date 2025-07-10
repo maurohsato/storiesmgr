@@ -169,7 +169,7 @@ const UserMenu: React.FC = () => {
             className="fixed inset-0 z-10" 
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-20">
+          <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-20 max-h-96 overflow-y-auto">
             <div className="py-1">
               {/* User Info */}
               <div className="px-4 py-3 border-b border-gray-100">
@@ -194,6 +194,9 @@ const UserMenu: React.FC = () => {
                           MFA Ativo
                         </span>
                       )}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      Logado desde: {new Date().toLocaleTimeString('pt-BR')}
                     </div>
                   </div>
                 </div>

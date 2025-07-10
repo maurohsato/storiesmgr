@@ -55,6 +55,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [mfaEnabled, setMfaEnabled] = useState(false);
 
+  // Force clear any invalid sessions on app start
+  useEffect(() => {
+    const clearInvalidSessions = async () => {
+      console.log('🧹 Limpando sessões inválidas...');
+      
+      // Clear any existing Supabase session
+      await supabase.auth.signOut();
+      
+      // Clear all local storage related to auth
+      clearSession();
+      
+      // Clear any MFA data that might be orphaned
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('supabase_mfa') || key.includes('temp_mfa')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      console.log('✅ Sessões limpas - usuário deve fazer login');
+    };
+    
+    clearInvalidSessions();
+  }, []); // Run only once on mount
+
   // Initialize auth state
   useEffect(() => {
     let mounted = true;
@@ -72,57 +96,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }, 5000); // 5 seconds timeout
 
-        // Check for existing session first
-        const savedSession = localStorage.getItem(SESSION_KEY);
-        if (savedSession) {
-          try {
-            const sessionData: SessionData = JSON.parse(savedSession);
-            
-            // Check if session is still valid
-            if (isSessionValid()) {
-              console.log('✅ Sessão local válida encontrada');
-              setUser(sessionData.user);
-              setProfile(sessionData.profile);
-              setMfaEnabled(sessionData.mfaEnabled);
-              updateLastActivity();
-              
-              if (mounted) {
-                clearTimeout(initializationTimeout);
-                setLoading(false);
-              }
-              return;
-            } else {
-              console.log('❌ Sessão local expirada - limpando');
-              clearSession();
-            }
-          } catch (error) {
-            console.error('Erro ao analisar sessão salva:', error);
-            clearSession();
-          }
-        }
-
-        // Get session from Supabase
-        console.log('🔍 Verificando sessão no Supabase...');
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Erro ao obter sessão:', error);
-          if (mounted) {
-            clearTimeout(initializationTimeout);
-            setLoading(false);
-          }
-          return;
-        }
-        
-        if (session?.user && mounted) {
-          console.log('✅ Sessão do Supabase encontrada para:', session.user.email);
-          setUser(session.user);
-          await loadUserProfile(session.user.id);
-        } else {
-          console.log('ℹ️ Nenhuma sessão ativa encontrada');
-        }
+        // For security, we always require fresh login
+        // No automatic session restoration
+        console.log('🔒 Política de segurança: Login obrigatório a cada sessão');
+        clearSession();
       } catch (error) {
         console.error('Erro na inicialização da autenticação:', error);
+        clearSession();
       } finally {
         if (mounted) {
           clearTimeout(initializationTimeout);
@@ -131,7 +111,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    initializeAuth();
+    // Delay initialization to ensure cleanup is complete
+    setTimeout(initializeAuth, 100);
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -140,14 +121,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         console.log('🔄 Estado de autenticação mudou:', event, session?.user?.email);
         
-        if (session?.user) {
-          setUser(session.user);
-          await loadUserProfile(session.user.id);
-        } else {
+        if (event === 'SIGNED_OUT' || !session?.user) {
+          console.log('🚪 Usuário deslogado');
           setUser(null);
           setProfile(null);
           setMfaEnabled(false);
           clearSession();
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          console.log('🔐 Usuário logado via evento:', session.user.email);
+          // O login será tratado pela função signIn, não aqui
         }
       }
     );
@@ -344,6 +326,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         setUser(data.user);
         await loadUserProfile(data.user.id);
+        
+        console.log('✅ Usuário e perfil carregados com sucesso');
       }
     } catch (error: any) {
       console.error('Erro no login:', error);

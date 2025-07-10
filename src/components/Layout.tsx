@@ -11,8 +11,11 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
-  const { canManageUsers, canManageContent } = useAuth();
+  const { canManageUsers, canManageContent, profile, user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Debug: log user state
+  console.log('Layout - User:', user?.email, 'Profile:', profile?.email, 'Role:', profile?.role);
 
   const baseNavigation = [
     { name: 'Dashboard', href: '/', icon: Home },
@@ -86,11 +89,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex items-center">
               {/* User Menu - Desktop */}
               <div className="hidden sm:flex sm:items-center">
+                {profile && (
+                  <div className="mr-4 text-sm text-gray-600">
+                    Olá, <span className="font-medium text-gray-900">{profile.full_name || profile.email}</span>
+                  </div>
+                )}
                 <UserMenu />
               </div>
               
               {/* Mobile menu button */}
               <div className="sm:hidden flex items-center ml-2">
+                {profile && (
+                  <div className="mr-2 text-xs text-gray-600">
+                    {profile.full_name || profile.email}
+                  </div>
+                )}
                 <button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                   className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-orange-700 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-orange-500"

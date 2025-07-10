@@ -8,6 +8,8 @@ const Dashboard: React.FC = () => {
   const { teams, clients, projects, userStories } = useAppContext();
   const { profile } = useAuth();
 
+  console.log('Dashboard - Profile:', profile);
+
   // Show restricted message for readers
   if (profile?.role === 'reader') {
     return (
