@@ -51,24 +51,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) {
         console.error('Erro ao carregar perfil:', error);
         
-        // Se o perfil não existe, criar um novo
+        // Se o perfil não existe, aguardar um pouco e tentar novamente
+        // (pode estar sendo criado pelo trigger)
         if (error.code === 'PGRST116') {
-          console.log('📝 Perfil não encontrado, criando novo perfil...');
-          const { data: userData } = await supabase.auth.getUser();
-          if (userData.user) {
-            try {
-              const newProfile = await db.createProfile({
-                id: userData.user.id,
-                email: userData.user.email!,
-                full_name: userData.user.user_metadata?.full_name || '',
-                role: userData.user.email === 'admin@demo.com' ? 'admin' : 'reader'
-              });
-              console.log('✅ Novo perfil criado:', newProfile);
-              return newProfile;
-            } catch (createError) {
-              console.error('Erro ao criar perfil:', createError);
-              return null;
-            }
+          console.log('📝 Perfil não encontrado, aguardando criação automática...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          const { data: retryProfile, error: retryError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          if (retryError) {
+            console.error('Perfil ainda não encontrado após retry:', retryError);
+            return null;
+          }
+          
+          if (retryProfile) {
+            console.log('✅ Perfil encontrado após retry:', retryProfile.email, 'Role:', retryProfile.role);
+            return retryProfile;
           }
         }
         return null;
@@ -102,7 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(false);
             setInitialized(true);
           }
-        }, 5000);
+        }, 10000); // Increased timeout to 10 seconds
 
         // Get current session
         const { data: { session }, error } = await supabase.auth.getSession();
