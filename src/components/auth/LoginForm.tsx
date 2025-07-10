@@ -146,7 +146,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
                     placeholder="000000"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Para demonstração, use qualquer código de 6 dígitos (ex: 123456)
+                    Digite o código de 6 dígitos do Google Authenticator
                   </p>
                 </div>
               )}
@@ -176,7 +176,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
                   placeholder="000000"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Para demonstração, use qualquer código de 6 dígitos (ex: 123456)
+                  Digite o código de 6 dígitos do Google Authenticator
                 </p>
               </div>
               
@@ -237,7 +237,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
               <div className="flex items-center">
                 <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />
                 <p className="text-xs text-red-800">
-                  <strong>🔐 MFA OBRIGATÓRIO:</strong> admin@demo.com deve usar autenticação de dois fatores.
+                  <strong>🔐 MFA OBRIGATÓRIO:</strong> admin@demo.com deve configurar Google Authenticator antes do primeiro login.
                 </p>
               </div>
             </div>

@@ -2,6 +2,8 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, auth } from '../lib/supabase';
 import { Database } from '../types/database';
+import { authenticator } from 'otplib';
+import QRCode from 'qrcode';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -268,22 +270,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string, mfaCode?: string) => {
     try {
       // Check if MFA is required for this user BEFORE attempting login
-      const userMfaEnabled = localStorage.getItem(`supabase_mfa_${email.replace('@', '_').replace('.', '_')}`) === 'true';
+      // Para verificar MFA, precisamos do user ID, então vamos fazer login primeiro
       
       // For admin@demo.com, MFA is MANDATORY
       const isMfaMandatory = email === 'admin@demo.com';
       
-      if ((userMfaEnabled || isMfaMandatory) && !mfaCode) {
-        throw new Error('MFA_REQUIRED');
-      }
-      
-      if ((userMfaEnabled || isMfaMandatory) && mfaCode) {
-        // Validate MFA code format
-        if (!/^\d{6}$/.test(mfaCode)) {
-          throw new Error('Código MFA inválido. Digite 6 dígitos numéricos.');
-        }
-      }
-
+      // Primeiro, tentar fazer login
       const { data, error } = await auth.signIn(email, password);
       
       if (error) {
@@ -299,6 +291,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       if (data.user) {
+        // Verificar se MFA está habilitado para este usuário
+        const userMfaEnabled = localStorage.getItem(`supabase_mfa_${data.user.id}`) === 'true';
+        
+        if ((userMfaEnabled || isMfaMandatory) && !mfaCode) {
+          // Fazer logout e solicitar MFA
+          await auth.signOut();
+          throw new Error('MFA_REQUIRED');
+        }
+        
+        if ((userMfaEnabled || isMfaMandatory) && mfaCode) {
+          // Verificar código MFA
+          const savedSecret = localStorage.getItem(`supabase_mfa_secret_${data.user.id}`);
+          
+          if (!savedSecret && isMfaMandatory) {
+            // Para admin@demo.com, se não tem MFA configurado, forçar configuração
+            await auth.signOut();
+            throw new Error('MFA não configurado. Configure o MFA antes de fazer login.');
+          }
+          
+          if (savedSecret) {
+            const isValidMFA = authenticator.verify({
+              token: mfaCode,
+              secret: savedSecret
+            });
+            
+            if (!isValidMFA) {
+              await auth.signOut();
+              throw new Error('Código MFA inválido. Verifique o código no Google Authenticator.');
+            }
+          }
+        }
+        
         // For admin@demo.com, automatically enable MFA
         if (email === 'admin@demo.com') {
           const mfaKey = `supabase_mfa_${data.user.id}`;
@@ -372,21 +396,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const enableMFA = async () => {
     if (!user) throw new Error('No user logged in');
     
-    // Generate a unique secret for this user
-    const secret = `JBSWY3DPEHPK3PX${user.id.slice(-8).toUpperCase()}`;
-    const qrCode = `otpauth://totp/UserStories:${user.email}?secret=${secret}&issuer=UserStories`;
+    // Gerar um secret único para este usuário usando otplib
+    const secret = authenticator.generateSecret();
     
-    return { secret, qrCode };
+    // Criar URL para o Google Authenticator
+    const otpAuthUrl = authenticator.keyuri(
+      user.email,
+      'User Stories Manager',
+      secret
+    );
+    
+    // Gerar QR Code
+    const qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl);
+    
+    // Salvar o secret temporariamente (será confirmado quando o usuário verificar)
+    localStorage.setItem(`temp_mfa_secret_${user.id}`, secret);
+    
+    return { 
+      secret, 
+      qrCode: qrCodeDataUrl,
+      manualEntryKey: secret.match(/.{1,4}/g)?.join(' ') || secret
+    };
   };
 
   const verifyMFA = async (code: string) => {
     if (!user) throw new Error('No user logged in');
     
-    // Para demonstração, aceitar qualquer código de 6 dígitos
-    const isValid = /^\d{6}$/.test(code);
+    // Obter o secret temporário
+    const tempSecret = localStorage.getItem(`temp_mfa_secret_${user.id}`);
+    if (!tempSecret) {
+      throw new Error('Secret MFA não encontrado. Inicie o processo novamente.');
+    }
+    
+    // Verificar o código usando otplib
+    const isValid = authenticator.verify({
+      token: code,
+      secret: tempSecret
+    });
     
     if (isValid) {
+      // Salvar o secret permanentemente
       localStorage.setItem(`supabase_mfa_${user.id}`, 'true');
+      localStorage.setItem(`supabase_mfa_secret_${user.id}`, tempSecret);
+      localStorage.removeItem(`temp_mfa_secret_${user.id}`);
       setMfaEnabled(true);
       
       // Update session with MFA enabled
@@ -401,12 +453,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const disableMFA = async (code: string) => {
     if (!user) throw new Error('No user logged in');
     
-    // Para demonstração, aceitar qualquer código de 6 dígitos
-    if (!/^\d{6}$/.test(code)) {
+    // Obter o secret salvo
+    const savedSecret = localStorage.getItem(`supabase_mfa_secret_${user.id}`);
+    if (!savedSecret) {
+      throw new Error('MFA não está configurado para este usuário');
+    }
+    
+    // Verificar o código atual
+    const isValid = authenticator.verify({
+      token: code,
+      secret: savedSecret
+    });
+    
+    if (!isValid) {
       throw new Error('Código MFA inválido');
     }
     
+    // Remover MFA
     localStorage.removeItem(`supabase_mfa_${user.id}`);
+    localStorage.removeItem(`supabase_mfa_secret_${user.id}`);
     setMfaEnabled(false);
     
     // Update session with MFA disabled
