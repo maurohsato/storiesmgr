@@ -37,6 +37,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
 
+  // Clear any existing session on app start for security
+  useEffect(() => {
+    const clearSession = async () => {
+      console.log('🧹 Limpando sessão existente para segurança...');
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+    };
+    
+    clearSession();
+  }, []); // Run only once on mount
+
   // Load user profile from Supabase
   const loadUserProfile = async (userId: string): Promise<Profile | null> => {
     try {
@@ -52,10 +64,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error('Erro ao carregar perfil:', error);
         
         // Se o perfil não existe, aguardar um pouco e tentar novamente
-        // (pode estar sendo criado pelo trigger)
         if (error.code === 'PGRST116') {
           console.log('📝 Perfil não encontrado, aguardando criação automática...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 3000));
           
           const { data: retryProfile, error: retryError } = await supabase
             .from('profiles')
@@ -104,38 +115,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(false);
             setInitialized(true);
           }
-        }, 10000); // Increased timeout to 10 seconds
+        }, 8000);
 
-        // Get current session
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // For security, we require fresh login every time
+        // Clear any existing session first
+        await supabase.auth.signOut();
         
-        if (error) {
-          console.error('Erro ao obter sessão:', error);
-          if (mounted) {
-            setLoading(false);
-            setInitialized(true);
-          }
-          return;
-        }
-
-        if (session?.user && mounted) {
-          console.log('✅ Sessão encontrada para:', session.user.email);
-          setUser(session.user);
-          
-          const userProfile = await loadUserProfile(session.user.id);
-          if (mounted) {
-            setProfile(userProfile);
-          }
-        } else {
-          console.log('❌ Nenhuma sessão ativa');
+        console.log('🔒 Política de segurança: Login obrigatório a cada sessão');
+        
+        if (mounted) {
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          setInitialized(true);
         }
       } catch (error) {
         console.error('Erro na inicialização da autenticação:', error);
+        if (mounted) {
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          setInitialized(true);
+        }
       } finally {
         if (mounted) {
           clearTimeout(timeoutId);
-          setLoading(false);
-          setInitialized(true);
         }
       }
     };
@@ -198,9 +202,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         const userProfile = await loadUserProfile(data.user.id);
         setProfile(userProfile);
+        
+        if (!userProfile) {
+          throw new Error('Perfil de usuário não encontrado. Contate o administrador.');
+        }
       }
     } catch (error: any) {
       console.error('Erro no login:', error);
+      setUser(null);
+      setProfile(null);
       throw error;
     } finally {
       setLoading(false);
