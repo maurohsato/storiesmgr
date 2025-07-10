@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth.tsx';
-import { LogIn, Eye, EyeOff, Loader2, Shield, AlertTriangle } from 'lucide-react';
+import { LogIn, Eye, EyeOff, Loader2, Shield, AlertTriangle, QrCode, X } from 'lucide-react';
 
 interface LoginFormProps {
   onToggleMode: () => void;
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
-  const { signIn } = useAuth();
+  const { signIn, enableMFA, verifyMFA } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mfaCode, setMfaCode] = useState('');
@@ -15,9 +15,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [requiresMFA, setRequiresMFA] = useState(false);
-
-  // Check if MFA is mandatory for this email
-  const isMfaMandatory = email === 'admin@demo.com';
+  const [needsMFASetup, setNeedsMFASetup] = useState(false);
+  
+  // MFA Setup states
+  const [mfaSecret, setMfaSecret] = useState('');
+  const [qrCode, setQrCode] = useState('');
+  const [setupCode, setSetupCode] = useState('');
+  const [mfaLoading, setMfaLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,8 +34,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
       if (err.message === 'MFA_REQUIRED') {
         setRequiresMFA(true);
         setError('');
-      } else if (err.message?.includes('Invalid login credentials') || err.message?.includes('invalid_credentials')) {
-        setError('Email ou senha incorretos. Verifique suas credenciais.');
+      } else if (err.message === 'MFA_SETUP_REQUIRED') {
+        setNeedsMFASetup(true);
+        setError('');
+        await handleMFASetup();
       } else {
         setError(err.message || 'Erro ao fazer login');
       }
@@ -40,11 +46,192 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
     }
   };
 
+  const handleMFASetup = async () => {
+    try {
+      setMfaLoading(true);
+      setError('');
+      
+      // First, we need to sign in to get the user context for MFA setup
+      // This is a temporary sign in just to set up MFA
+      const { signIn: tempSignIn } = useAuth();
+      
+      // For MFA setup, we'll use the enableMFA function
+      const { secret, qrCode } = await enableMFA();
+      setMfaSecret(secret);
+      setQrCode(qrCode);
+    } catch (error) {
+      setError('Erro ao configurar MFA. Tente novamente.');
+      console.error('MFA setup error:', error);
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleMFASetupVerification = async () => {
+    if (!setupCode || setupCode.length !== 6) {
+      setError('Digite um código de 6 dígitos');
+      return;
+    }
+
+    try {
+      setMfaLoading(true);
+      setError('');
+      
+      const isValid = await verifyMFA(setupCode);
+      
+      if (isValid) {
+        // MFA configured successfully, now try to sign in
+        setNeedsMFASetup(false);
+        setRequiresMFA(true);
+        setSetupCode('');
+        setMfaCode('');
+        alert('MFA configurado com sucesso! Agora digite o código para fazer login.');
+      } else {
+        setError('Código inválido. Verifique o código no Google Authenticator.');
+      }
+    } catch (error) {
+      setError('Erro ao verificar código MFA');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
   const handleBackToCredentials = () => {
     setRequiresMFA(false);
+    setNeedsMFASetup(false);
     setMfaCode('');
+    setSetupCode('');
     setError('');
   };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert('Copiado para a área de transferência!');
+  };
+
+  // MFA Setup Modal
+  if (needsMFASetup) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <img 
+              src="/image.png" 
+              alt="Inectar Logo" 
+              className="mx-auto h-16 w-auto"
+            />
+            <h2 className="mt-6 text-3xl font-bold text-gray-900">
+              Configurar Autenticação 2FA
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              MFA é obrigatório para todos os usuários
+            </p>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-lg space-y-6">
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="flex items-center">
+                <Shield className="h-5 w-5 text-red-600 mr-2" />
+                <p className="text-sm text-red-800 font-medium">
+                  🔒 Autenticação de Dois Fatores Obrigatória
+                </p>
+              </div>
+              <p className="text-xs text-red-700 mt-2">
+                Para sua segurança, todos os usuários devem configurar MFA antes de acessar o sistema.
+              </p>
+            </div>
+
+            <div className="text-sm text-gray-600 space-y-2">
+              <p><strong>📱 Passos para configurar:</strong></p>
+              <ol className="list-decimal list-inside space-y-1 ml-2">
+                <li>Instale o Google Authenticator no seu celular</li>
+                <li>Escaneie o QR Code abaixo ou digite o código manualmente</li>
+                <li>Digite o código de 6 dígitos para confirmar</li>
+              </ol>
+            </div>
+
+            {/* QR Code */}
+            <div className="flex justify-center">
+              <div className="bg-white border-2 border-gray-300 p-2 rounded-lg">
+                {qrCode ? (
+                  <img 
+                    src={qrCode} 
+                    alt="QR Code para Google Authenticator"
+                    className="w-48 h-48"
+                  />
+                ) : (
+                  <div className="w-48 h-48 bg-white flex items-center justify-center border border-gray-200 rounded">
+                    <div className="text-center">
+                      <QrCode className="h-16 w-16 text-gray-400 mx-auto mb-2" />
+                      <p className="text-xs text-gray-500">Gerando QR Code...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Manual entry code */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Código para configuração manual:
+              </label>
+              <div className="flex mb-2">
+                <input
+                  type="text"
+                  value={mfaSecret.match(/.{1,4}/g)?.join(' ') || mfaSecret}
+                  readOnly
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-xs font-mono"
+                />
+                <button
+                  onClick={() => copyToClipboard(mfaSecret)}
+                  className="px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 hover:bg-gray-100 text-sm"
+                >
+                  Copiar
+                </button>
+              </div>
+            </div>
+
+            {/* Verification code input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Código de verificação:
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={setupCode}
+                onChange={(e) => setSetupCode(e.target.value.replace(/\D/g, ''))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-center text-lg tracking-widest"
+                placeholder="000000"
+              />
+            </div>
+
+            {error && (
+              <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                {error}
+              </div>
+            )}
+
+            <div className="flex space-x-3">
+              <button
+                onClick={handleBackToCredentials}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={handleMFASetupVerification}
+                disabled={mfaLoading || setupCode.length !== 6}
+                className="flex-1 px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {mfaLoading ? 'Verificando...' : 'Configurar MFA'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -90,12 +277,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                   placeholder="seu@email.com"
                 />
-                {isMfaMandatory && (
-                  <div className="mt-2 flex items-center text-sm text-orange-700 bg-orange-50 p-2 rounded">
-                    <Shield className="h-4 w-4 mr-2" />
-                    <span>MFA obrigatório para este usuário</span>
-                  </div>
-                )}
               </div>
 
               <div>
@@ -127,29 +308,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
                   </button>
                 </div>
               </div>
-
-              {/* MFA Code field for mandatory MFA users */}
-              {isMfaMandatory && (
-                <div>
-                  <label htmlFor="mfaCode" className="block text-sm font-medium text-gray-700">
-                    Código MFA (Obrigatório)
-                  </label>
-                  <input
-                    id="mfaCode"
-                    name="mfaCode"
-                    type="text"
-                    required={isMfaMandatory}
-                    maxLength={6}
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-orange-500 focus:border-orange-500 text-center text-lg tracking-widest"
-                    placeholder="000000"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Digite o código de 6 dígitos do Google Authenticator
-                  </p>
-                </div>
-              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -193,7 +351,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
           <div>
             <button
               type="submit"
-              disabled={loading || (isMfaMandatory && !requiresMFA && mfaCode.length !== 6)}
+              disabled={loading || (requiresMFA && mfaCode.length !== 6)}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? (
@@ -221,31 +379,24 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
         </form>
 
         {/* System status info */}
-        {!requiresMFA && (
-          <div className="mt-8 p-4 bg-green-50 rounded-lg border border-green-200">
-            <h3 className="text-sm font-medium text-green-900 mb-2">
-              ✅ Sistema Conectado ao Supabase
+        {!requiresMFA && !needsMFASetup && (
+          <div className="mt-8 p-4 bg-red-50 rounded-lg border border-red-200">
+            <h3 className="text-sm font-medium text-red-900 mb-2">
+              🔒 Segurança Obrigatória
             </h3>
-            <div className="text-xs text-green-800 space-y-1">
-              <p>• Autenticação em tempo real</p>
-              <p>• Dados salvos no banco PostgreSQL</p>
-              <p>• Row Level Security (RLS) ativo</p>
-              <p>• Sessões com timeout de 30 minutos</p>
-              <p>• <strong>admin@demo.com</strong> tem acesso total</p>
-            </div>
-            <div className="mt-3 p-2 bg-red-50 rounded border border-red-200">
-              <div className="flex items-center">
-                <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />
-                <p className="text-xs text-red-800">
-                  <strong>🔐 MFA OBRIGATÓRIO:</strong> admin@demo.com deve configurar Google Authenticator antes do primeiro login.
-                </p>
-              </div>
+            <div className="text-xs text-red-800 space-y-1">
+              <p><strong>• MFA OBRIGATÓRIO para TODOS os usuários</strong></p>
+              <p>• Primeira vez? Configure Google Authenticator</p>
+              <p>• Dados protegidos com Row Level Security</p>
+              <p>• Sessões expiram em 30 minutos de inatividade</p>
             </div>
             <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
-              <p className="text-xs text-yellow-800">
-                <strong>👤 Controle de Acesso:</strong> Novos usuários são criados com acesso restrito. 
-                Apenas <strong>admin@demo.com</strong> pode conceder permissões.
-              </p>
+              <div className="flex items-center">
+                <AlertTriangle className="h-4 w-4 text-yellow-600 mr-2" />
+                <p className="text-xs text-yellow-800">
+                  <strong>Primeira vez?</strong> Você será guiado para configurar o MFA após inserir suas credenciais.
+                </p>
+              </div>
             </div>
           </div>
         )}

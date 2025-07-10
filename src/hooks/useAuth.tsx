@@ -36,8 +36,8 @@ export const useAuth = () => {
   return context;
 };
 
-// Session management constants - aumentar timeout para 30 minutos
-const IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+// Session management constants - 30 minutos
+const IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const SESSION_KEY = 'supabase_session';
 const LAST_ACTIVITY_KEY = 'supabase_last_activity';
 
@@ -57,9 +57,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Initialize auth state
   useEffect(() => {
     let mounted = true;
+    let initializationTimeout: NodeJS.Timeout;
 
     const initializeAuth = async () => {
       try {
+        console.log('🔄 Inicializando autenticação...');
+        
+        // Set a timeout to prevent infinite loading
+        initializationTimeout = setTimeout(() => {
+          if (mounted) {
+            console.log('⏰ Timeout na inicialização - definindo loading como false');
+            setLoading(false);
+          }
+        }, 5000); // 5 seconds timeout
+
         // Check for existing session first
         const savedSession = localStorage.getItem(SESSION_KEY);
         if (savedSession) {
@@ -68,40 +79,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             // Check if session is still valid
             if (isSessionValid()) {
+              console.log('✅ Sessão local válida encontrada');
               setUser(sessionData.user);
               setProfile(sessionData.profile);
               setMfaEnabled(sessionData.mfaEnabled);
               updateLastActivity();
               
               if (mounted) {
+                clearTimeout(initializationTimeout);
                 setLoading(false);
               }
               return;
             } else {
-              // Session expired, clear it
+              console.log('❌ Sessão local expirada - limpando');
               clearSession();
             }
           } catch (error) {
-            console.error('Error parsing saved session:', error);
+            console.error('Erro ao analisar sessão salva:', error);
             clearSession();
           }
         }
 
         // Get session from Supabase
+        console.log('🔍 Verificando sessão no Supabase...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('Erro ao obter sessão:', error);
+          if (mounted) {
+            clearTimeout(initializationTimeout);
+            setLoading(false);
+          }
+          return;
         }
         
         if (session?.user && mounted) {
+          console.log('✅ Sessão do Supabase encontrada para:', session.user.email);
           setUser(session.user);
           await loadUserProfile(session.user.id);
+        } else {
+          console.log('ℹ️ Nenhuma sessão ativa encontrada');
         }
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        console.error('Erro na inicialização da autenticação:', error);
       } finally {
         if (mounted) {
+          clearTimeout(initializationTimeout);
           setLoading(false);
         }
       }
@@ -114,7 +137,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       async (event, session) => {
         if (!mounted) return;
 
-        console.log('Auth state changed:', event, session?.user?.email);
+        console.log('🔄 Estado de autenticação mudou:', event, session?.user?.email);
         
         if (session?.user) {
           setUser(session.user);
@@ -130,6 +153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       mounted = false;
+      clearTimeout(initializationTimeout);
       subscription.unsubscribe();
     };
   }, []);
@@ -137,6 +161,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Load user profile from Supabase
   const loadUserProfile = async (userId: string) => {
     try {
+      console.log('👤 Carregando perfil do usuário:', userId);
+      
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -144,17 +170,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (error) {
-        console.error('Error loading profile:', error);
+        console.error('Erro ao carregar perfil:', error);
         return;
       }
 
       if (profile) {
+        console.log('✅ Perfil carregado:', profile.email, 'Role:', profile.role);
         setProfile(profile);
+        
         // Check if MFA is enabled for this user
         const mfaStatus = localStorage.getItem(`supabase_mfa_${userId}`) === 'true';
         setMfaEnabled(mfaStatus);
         
-        // Save session data for idle timeout management
+        // Save session data
         saveSession({
           id: userId,
           email: profile.email,
@@ -163,7 +191,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } as User, profile, mfaStatus);
       }
     } catch (error) {
-      console.error('Error loading profile:', error);
+      console.error('Erro ao carregar perfil:', error);
     }
   };
 
@@ -174,7 +202,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return now;
   };
 
-  // Check if session is still valid (not expired due to inactivity)
+  // Check if session is still valid
   const isSessionValid = (): boolean => {
     const lastActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
     if (!lastActivity) return false;
@@ -202,47 +230,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem(LAST_ACTIVITY_KEY);
   };
 
-  // Auto logout when session expires due to inactivity
+  // Auto logout when session expires
   useEffect(() => {
     if (!user || !profile) return;
 
     const checkSessionExpiry = () => {
       if (!isSessionValid()) {
-        // Session expired due to inactivity, logout user
+        console.log('⏰ Sessão expirou por inatividade');
         signOut();
         alert('Sua sessão expirou por inatividade. Faça login novamente.');
       }
     };
 
-    // Check every 5 minutes instead of 30 seconds
+    // Check every 5 minutes
     const interval = setInterval(checkSessionExpiry, 5 * 60 * 1000);
     
     return () => clearInterval(interval);
   }, [user, profile]);
 
-  // Track user activity to extend session
+  // Track user activity
   useEffect(() => {
     if (!user || !profile) return;
 
     const handleUserActivity = () => {
       if (user && profile && isSessionValid()) {
-        // Update last activity and save session
         saveSession(user, profile, mfaEnabled);
       }
     };
 
-    // Events that indicate user activity
-    const events = [
-      'mousedown', 
-      'mousemove', 
-      'keypress', 
-      'scroll', 
-      'touchstart', 
-      'click',
-      'focus'
-    ];
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
     
-    // Add throttling to avoid too frequent updates
     let throttleTimeout: NodeJS.Timeout | null = null;
     const throttledHandler = () => {
       if (throttleTimeout) return;
@@ -269,103 +286,102 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string, mfaCode?: string) => {
     try {
-      // Check if MFA is required for this user BEFORE attempting login
-      // Para verificar MFA, precisamos do user ID, então vamos fazer login primeiro
+      console.log('🔐 Tentando fazer login para:', email);
       
-      // For admin@demo.com, MFA is MANDATORY
-      const isMfaMandatory = email === 'admin@demo.com';
-      
-      // Primeiro, tentar fazer login
+      // MFA é OBRIGATÓRIO para TODOS os usuários
       const { data, error } = await auth.signIn(email, password);
       
       if (error) {
-        // Provide more specific error messages
-        if (error.message?.includes('Invalid login credentials') || error.message?.includes('invalid_credentials')) {
-          throw new Error('Email ou senha incorretos. Verifique suas credenciais.');
+        if (error.message?.includes('Invalid login credentials')) {
+          throw new Error('Email ou senha incorretos.');
         } else if (error.message?.includes('Email not confirmed')) {
           throw new Error('Email não confirmado. Verifique sua caixa de entrada.');
         } else if (error.message?.includes('Too many requests')) {
-          throw new Error('Muitas tentativas de login. Tente novamente em alguns minutos.');
+          throw new Error('Muitas tentativas. Tente novamente em alguns minutos.');
         }
         throw error;
       }
       
       if (data.user) {
-        // Verificar se MFA está habilitado para este usuário
+        console.log('✅ Login básico bem-sucedido para:', email);
+        
+        // Verificar se MFA está configurado para este usuário
         const userMfaEnabled = localStorage.getItem(`supabase_mfa_${data.user.id}`) === 'true';
         
-        if ((userMfaEnabled || isMfaMandatory) && !mfaCode) {
-          // Fazer logout e solicitar MFA
+        if (!userMfaEnabled) {
+          // MFA não configurado - usuário precisa configurar primeiro
+          await auth.signOut();
+          throw new Error('MFA_SETUP_REQUIRED');
+        }
+        
+        if (!mfaCode) {
+          // MFA configurado mas código não fornecido
           await auth.signOut();
           throw new Error('MFA_REQUIRED');
         }
         
-        if ((userMfaEnabled || isMfaMandatory) && mfaCode) {
-          // Verificar código MFA
-          const savedSecret = localStorage.getItem(`supabase_mfa_secret_${data.user.id}`);
-          
-          if (!savedSecret && isMfaMandatory) {
-            // Para admin@demo.com, se não tem MFA configurado, forçar configuração
-            await auth.signOut();
-            throw new Error('MFA não configurado. Configure o MFA antes de fazer login.');
-          }
-          
-          if (savedSecret) {
-            const isValidMFA = authenticator.verify({
-              token: mfaCode,
-              secret: savedSecret
-            });
-            
-            if (!isValidMFA) {
-              await auth.signOut();
-              throw new Error('Código MFA inválido. Verifique o código no Google Authenticator.');
-            }
-          }
+        // Verificar código MFA
+        const savedSecret = localStorage.getItem(`supabase_mfa_secret_${data.user.id}`);
+        
+        if (!savedSecret) {
+          await auth.signOut();
+          throw new Error('MFA não configurado corretamente. Configure novamente.');
         }
         
-        // For admin@demo.com, automatically enable MFA
-        if (email === 'admin@demo.com') {
-          const mfaKey = `supabase_mfa_${data.user.id}`;
-          localStorage.setItem(mfaKey, 'true');
-          setMfaEnabled(true);
+        const isValidMFA = authenticator.verify({
+          token: mfaCode,
+          secret: savedSecret
+        });
+        
+        if (!isValidMFA) {
+          await auth.signOut();
+          throw new Error('Código MFA inválido. Verifique o código no Google Authenticator.');
         }
+        
+        console.log('✅ MFA verificado com sucesso');
+        
+        // Set MFA as enabled
+        localStorage.setItem(`supabase_mfa_${data.user.id}`, 'true');
+        setMfaEnabled(true);
 
         setUser(data.user);
         await loadUserProfile(data.user.id);
       }
     } catch (error: any) {
-      console.error('Sign in error:', error);
+      console.error('Erro no login:', error);
       throw error;
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
+      console.log('📝 Criando nova conta para:', email);
+      
       const { data, error } = await auth.signUp(email, password, fullName);
       
       if (error) {
-        // Provide more specific error messages for signup
         if (error.message?.includes('User already registered')) {
-          throw new Error('Este email já está cadastrado. Tente fazer login ou use outro email.');
+          throw new Error('Este email já está cadastrado. Tente fazer login.');
         } else if (error.message?.includes('Password should be at least')) {
           throw new Error('A senha deve ter pelo menos 6 caracteres.');
         } else if (error.message?.includes('Invalid email')) {
-          throw new Error('Email inválido. Verifique o formato do email.');
+          throw new Error('Email inválido.');
         }
         throw error;
       }
       
       if (data.user) {
-        // Registration successful, user needs to verify email
+        console.log('✅ Conta criada com sucesso para:', email);
         return;
       }
     } catch (error: any) {
-      console.error('Sign up error:', error);
+      console.error('Erro no cadastro:', error);
       throw error;
     }
   };
 
   const signOut = async () => {
+    console.log('🚪 Fazendo logout...');
     await auth.signOut();
     setUser(null);
     setProfile(null);
@@ -386,8 +402,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
 
     setProfile(updatedProfile);
-    
-    // Update session with new profile data
     saveSession(user, updatedProfile, mfaEnabled);
     
     return updatedProfile;
@@ -396,20 +410,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const enableMFA = async () => {
     if (!user) throw new Error('No user logged in');
     
-    // Gerar um secret único para este usuário usando otplib
     const secret = authenticator.generateSecret();
     
-    // Criar URL para o Google Authenticator
     const otpAuthUrl = authenticator.keyuri(
       user.email,
       'User Stories Manager',
       secret
     );
     
-    // Gerar QR Code
     const qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl);
     
-    // Salvar o secret temporariamente (será confirmado quando o usuário verificar)
     localStorage.setItem(`temp_mfa_secret_${user.id}`, secret);
     
     return { 
@@ -422,26 +432,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const verifyMFA = async (code: string) => {
     if (!user) throw new Error('No user logged in');
     
-    // Obter o secret temporário
     const tempSecret = localStorage.getItem(`temp_mfa_secret_${user.id}`);
     if (!tempSecret) {
       throw new Error('Secret MFA não encontrado. Inicie o processo novamente.');
     }
     
-    // Verificar o código usando otplib
     const isValid = authenticator.verify({
       token: code,
       secret: tempSecret
     });
     
     if (isValid) {
-      // Salvar o secret permanentemente
       localStorage.setItem(`supabase_mfa_${user.id}`, 'true');
       localStorage.setItem(`supabase_mfa_secret_${user.id}`, tempSecret);
       localStorage.removeItem(`temp_mfa_secret_${user.id}`);
       setMfaEnabled(true);
       
-      // Update session with MFA enabled
       if (profile) {
         saveSession(user, profile, true);
       }
@@ -453,13 +459,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const disableMFA = async (code: string) => {
     if (!user) throw new Error('No user logged in');
     
-    // Obter o secret salvo
     const savedSecret = localStorage.getItem(`supabase_mfa_secret_${user.id}`);
     if (!savedSecret) {
-      throw new Error('MFA não está configurado para este usuário');
+      throw new Error('MFA não está configurado');
     }
     
-    // Verificar o código atual
     const isValid = authenticator.verify({
       token: code,
       secret: savedSecret
@@ -469,12 +473,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error('Código MFA inválido');
     }
     
-    // Remover MFA
     localStorage.removeItem(`supabase_mfa_${user.id}`);
     localStorage.removeItem(`supabase_mfa_secret_${user.id}`);
     setMfaEnabled(false);
     
-    // Update session with MFA disabled
     if (profile) {
       saveSession(user, profile, false);
     }
@@ -488,11 +490,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const canManageUsers = () => hasRole('admin');
-  
   const canManageContent = () => hasRole(['admin', 'project_manager']);
-  
   const canCreateContent = () => hasRole(['admin', 'project_manager', 'collaborator']);
-  
   const isReadOnly = () => hasRole('reader');
 
   const value = {

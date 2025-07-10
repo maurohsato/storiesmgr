@@ -180,17 +180,20 @@ const UserMenu: React.FC = () => {
                     </p>
                   </div>
                   
-                  {/* Show MFA status for admin */}
-                  {profile.email === 'admin@demo.com' && (
-                    <div className="px-4 py-2 bg-red-50 border-l-4 border-red-400">
-                      <div className="flex items-center">
-                        <Shield className="h-4 w-4 text-red-600 mr-2" />
-                        <p className="text-xs text-red-800 font-medium">
-                          MFA OBRIGATÓRIO para admin
-                        </p>
-                      </div>
+                  {/* MFA Status */}
+                  <div className="px-4 py-2 bg-red-50 border-l-4 border-red-400">
+                    <div className="flex items-center">
+                      <Shield className="h-4 w-4 text-red-600 mr-2" />
+                      <p className="text-xs text-red-800 font-medium">
+                        MFA OBRIGATÓRIO para todos os usuários
+                      </p>
                     </div>
-                  )}
+                    {!mfaEnabled && (
+                      <p className="text-xs text-red-700 mt-1">
+                        ⚠️ Configure o MFA para manter acesso ao sistema
+                      </p>
+                    )}
+                  </div>
                   
                   {!mfaEnabled ? (
                     <button
@@ -202,9 +205,9 @@ const UserMenu: React.FC = () => {
                       className="flex items-center w-full px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors disabled:opacity-50"
                     >
                       <Shield className="h-4 w-4 mr-3" />
-                      Ativar Autenticação 2FA
+                      Configurar Autenticação 2FA
                     </button>
-                  ) : profile.email !== 'admin@demo.com' ? (
+                  ) : (
                     <button
                       onClick={() => {
                         setIsOpen(false);
@@ -213,12 +216,8 @@ const UserMenu: React.FC = () => {
                       className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
                     >
                       <Shield className="h-4 w-4 mr-3" />
-                      Desativar Autenticação 2FA
+                      Reconfigurar Autenticação 2FA
                     </button>
-                  ) : (
-                    <div className="px-4 py-2 text-xs text-gray-500">
-                      MFA não pode ser desabilitado para admin
-                    </div>
                   )}
                 </div>
                 
@@ -263,7 +262,7 @@ const UserMenu: React.FC = () => {
                 <p>3. Digite o código de 6 dígitos para confirmar</p>
               </div>
 
-              {/* QR Code placeholder */}
+              {/* QR Code */}
               <div className="flex justify-center">
                 <div className="bg-white border-2 border-gray-300 p-2 rounded-lg">
                   {qrCode ? (
@@ -302,13 +301,6 @@ const UserMenu: React.FC = () => {
                   >
                     Copiar
                   </button>
-                </div>
-                <div className="text-xs text-gray-500 bg-green-50 p-2 rounded">
-                  <p><strong>📱 Como configurar:</strong></p>
-                  <p>1. Abra o Google Authenticator</p>
-                  <p>2. Toque em "+" para adicionar conta</p>
-                  <p>3. Escaneie o QR Code ou digite o código manual</p>
-                  <p>4. Digite o código de 6 dígitos gerado</p>
                 </div>
               </div>
 
