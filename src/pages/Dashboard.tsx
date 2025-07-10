@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../hooks/useAuth';
 import { Users, Building2, FolderOpen, FileText, Plus, TrendingUp } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
