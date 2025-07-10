@@ -12,32 +12,63 @@ const Dashboard: React.FC = () => {
   if (profile?.role === 'reader') {
     return (
       <div className="px-4 sm:px-6 lg:px-8">
-        <div className="text-center py-12">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 max-w-2xl mx-auto">
-            <h1 className="text-2xl font-bold text-yellow-900 mb-4">
-              Bem-vindo ao Sistema de Histórias de Usuário
-            </h1>
-            <p className="text-yellow-800 mb-6">
-              Sua conta foi criada com sucesso, mas ainda está aguardando aprovação do administrador.
-            </p>
-            <div className="bg-white border border-yellow-300 rounded-md p-4 text-left">
-              <h3 className="font-medium text-yellow-900 mb-2">📋 Próximos passos:</h3>
-              <ul className="text-sm text-yellow-800 space-y-1">
-                <li>• Entre em contato com <strong>admin@demo.com</strong></li>
-                <li>• Solicite as permissões necessárias para sua função</li>
-                <li>• Aguarde a aprovação da sua conta</li>
-                <li>• Após aprovação, você terá acesso às funcionalidades</li>
-              </ul>
-            </div>
-            <div className="mt-6 text-sm text-yellow-700">
-              <p><strong>Seu perfil atual:</strong> Leitor (Acesso Restrito)</p>
-              <p><strong>Email:</strong> {profile.email}</p>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-8">
+              <div className="flex justify-center mb-6">
+                <div className="h-16 w-16 bg-red-100 rounded-full flex items-center justify-center">
+                  <span className="text-2xl">🚫</span>
+                </div>
+              </div>
+              
+              <h1 className="text-2xl font-bold text-red-900 mb-4">
+                Acesso Negado
+              </h1>
+              
+              <p className="text-red-800 mb-6">
+                Sua conta não possui permissões para acessar o sistema. Usuários com perfil "Leitor" 
+                não têm acesso a nenhuma funcionalidade até que um administrador altere suas permissões.
+              </p>
+              
+              <div className="bg-white border border-red-300 rounded-md p-4 text-left mb-6">
+                <h3 className="font-medium text-red-900 mb-3">📋 Para obter acesso:</h3>
+                <ol className="text-sm text-red-800 space-y-2 list-decimal list-inside">
+                  <li>Entre em contato com um administrador do sistema</li>
+                  <li>Solicite as permissões adequadas para sua função</li>
+                  <li>Aguarde a aprovação e alteração do seu perfil</li>
+                  <li>Faça logout e login novamente após a aprovação</li>
+                </ol>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
+                <h4 className="font-medium text-blue-900 mb-2">👥 Contatos dos Administradores:</h4>
+                <p className="text-sm text-blue-800">
+                  <strong>Email:</strong> admin@demo.com<br />
+                  <strong>Perfil necessário:</strong> Colaborador (mínimo) para criar histórias
+                </p>
+              </div>
+              
+              <div className="text-sm text-red-700 bg-red-100 p-3 rounded">
+                <p><strong>Seu perfil atual:</strong> {getRoleLabel(profile.role)} (Sem Acesso)</p>
+                <p><strong>Email:</strong> {profile.email}</p>
+                <p><strong>Criado em:</strong> {new Date(profile.created_at).toLocaleDateString('pt-BR')}</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
     );
   }
+
+  const getRoleLabel = (role: string) => {
+    const labels: Record<string, string> = {
+      admin: 'Administrador',
+      project_manager: 'Gerente de Projeto',
+      collaborator: 'Colaborador',
+      reader: 'Leitor',
+    };
+    return labels[role] || role;
+  };
 
   const stats = [
     {

@@ -48,25 +48,26 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
     if (profile.role === 'reader') {
       return (
         <div className="flex flex-col items-center justify-center min-h-64 p-8">
-          <div className="text-center">
-            <Shield className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Aguardando Aprovação
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Sua conta foi criada com sucesso, mas ainda não possui permissões para acessar esta funcionalidade.
-            </p>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-              <div className="flex">
-                <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" />
-                <div className="text-sm text-yellow-800">
-                  <p><strong>Próximos passos:</strong></p>
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>Entre em contato com um administrador</li>
-                    <li>Solicite as permissões necessárias</li>
-                    <li>Aguarde a aprovação da sua conta</li>
-                  </ul>
-                  <p className="mt-3"><strong>Seu perfil atual:</strong> {getRoleLabel(profile.role)}</p>
+          <div className="text-center max-w-md">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+              <Shield className="mx-auto h-12 w-12 text-red-500 mb-4" />
+              <h3 className="text-lg font-medium text-red-900 mb-2">
+                Acesso Negado
+              </h3>
+              <p className="text-sm text-red-700 mb-4">
+                Usuários com perfil "Leitor" não têm acesso a esta funcionalidade.
+              </p>
+              <div className="bg-white border border-red-300 rounded-md p-3">
+                <div className="flex items-start">
+                  <AlertTriangle className="h-4 w-4 text-red-500 mr-2 mt-0.5" />
+                  <div className="text-xs text-red-800 text-left">
+                    <p><strong>Para obter acesso:</strong></p>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>Contate admin@demo.com</li>
+                      <li>Solicite alteração do seu perfil</li>
+                      <li>Aguarde aprovação do administrador</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>

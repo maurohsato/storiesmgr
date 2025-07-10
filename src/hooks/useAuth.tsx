@@ -16,7 +16,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
-  enableMFA: () => Promise<{ secret: string; qrCode: string }>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  enableMFA: () => Promise<{ secret: string; qrCode: string; manualEntryKey: string }>;
   verifyMFA: (code: string) => Promise<boolean>;
   disableMFA: (code: string) => Promise<void>;
   hasRole: (roles: Profile['role'] | Profile['role'][]) => boolean;
@@ -301,15 +302,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('MFA_REQUIRED');
       }
       
-      // Verificar código MFA primeiro (implementação simplificada)
+      // Verificar código MFA primeiro
       const savedSecret = localStorage.getItem(`supabase_mfa_secret_${email}`);
       
       if (!savedSecret) {
         throw new Error('MFA não configurado corretamente. Configure novamente.');
       }
       
-      // Verificação simplificada do código MFA
-      const isValidMFA = verifyTOTP(mfaCode, savedSecret);
+      // Verificação real do código MFA usando otplib
+      const isValidMFA = authenticator.verify({
+        token: mfaCode,
+        secret: savedSecret
+      });
       
       if (!isValidMFA) {
         throw new Error('Código MFA inválido. Verifique o código no Google Authenticator.');
@@ -345,18 +349,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('Erro no login:', error);
       throw error;
     }
-  };
-
-  // Função para verificar código TOTP (implementação simplificada)
-  const verifyTOTP = (token: string, secret: string) => {
-    // Para demonstração, aceitar alguns códigos específicos
-    const validCodes = ['123456', '000000', '111111'];
-    
-    // Simular validação baseada no tempo
-    const time = Math.floor(Date.now() / 1000 / 30);
-    const timeBasedCode = String(time % 1000000).padStart(6, '0');
-    
-    return validCodes.includes(token) || token === timeBasedCode;
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -413,13 +405,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return updatedProfile;
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    if (!user) throw new Error('No user logged in');
+    
+    // First verify current password by attempting to sign in
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: user.email!,
+      password: currentPassword
+    });
+    
+    if (verifyError) {
+      throw new Error('Senha atual incorreta');
+    }
+    
+    // Update password
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+    
+    if (error) {
+      throw new Error('Erro ao alterar senha: ' + error.message);
+    }
+  };
+
   const enableMFA = async () => {
     if (!user) throw new Error('No user logged in');
     
     const secret = authenticator.generateSecret();
     
     const otpAuthUrl = authenticator.keyuri(
-      user.email,
+      user.email!,
       'User Stories Manager',
       secret
     );
@@ -451,6 +466,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (isValid) {
       localStorage.setItem(`supabase_mfa_${user.id}`, 'true');
       localStorage.setItem(`supabase_mfa_secret_${user.id}`, tempSecret);
+      localStorage.setItem(`supabase_mfa_secret_${user.email}`, tempSecret);
       localStorage.removeItem(`temp_mfa_secret_${user.id}`);
       setMfaEnabled(true);
       
@@ -481,6 +497,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     localStorage.removeItem(`supabase_mfa_${user.id}`);
     localStorage.removeItem(`supabase_mfa_secret_${user.id}`);
+    localStorage.removeItem(`supabase_mfa_secret_${user.email}`);
     setMfaEnabled(false);
     
     if (profile) {
@@ -509,6 +526,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signUp,
     signOut,
     updateProfile,
+    changePassword,
     enableMFA,
     verifyMFA,
     disableMFA,

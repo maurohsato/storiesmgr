@@ -1,16 +1,31 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth.tsx';
-import { User, LogOut, Settings, ChevronDown, Shield, QrCode, X } from 'lucide-react';
+import { User, LogOut, Settings, ChevronDown, Shield, QrCode, X, Key, Eye, EyeOff } from 'lucide-react';
 
 const UserMenu: React.FC = () => {
-  const { profile, signOut, mfaEnabled, enableMFA, verifyMFA, disableMFA } = useAuth();
+  const { profile, signOut, mfaEnabled, enableMFA, verifyMFA, disableMFA, changePassword } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [showMFASetup, setShowMFASetup] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [mfaSecret, setMfaSecret] = useState('');
   const [qrCode, setQrCode] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [mfaLoading, setMfaLoading] = useState(false);
   const [mfaError, setMfaError] = useState('');
+  
+  // Password change states
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   if (!profile) return null;
 
@@ -95,6 +110,31 @@ const UserMenu: React.FC = () => {
     }
   };
 
+  const handlePasswordChange = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError('As senhas não coincidem');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setPasswordError('A nova senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    try {
+      setPasswordLoading(true);
+      setPasswordError('');
+      await changePassword(passwordData.currentPassword, passwordData.newPassword);
+      setShowPasswordChange(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      alert('Senha alterada com sucesso!');
+    } catch (error: any) {
+      setPasswordError(error.message || 'Erro ao alterar senha');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     alert('Copiado para a área de transferência!');
@@ -161,15 +201,16 @@ const UserMenu: React.FC = () => {
 
               {/* Menu Items */}
               <div className="py-1">
+                {/* Password Change */}
                 <button
                   onClick={() => {
                     setIsOpen(false);
-                    // TODO: Implement profile settings
+                    setShowPasswordChange(true);
                   }}
                   className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
-                  <Settings className="h-4 w-4 mr-3" />
-                  Configurações do Perfil
+                  <Key className="h-4 w-4 mr-3" />
+                  Alterar Senha
                 </button>
 
                 {/* MFA Settings */}
@@ -237,6 +278,127 @@ const UserMenu: React.FC = () => {
             </div>
           </div>
         </>
+      )}
+
+      {/* Password Change Modal */}
+      {showPasswordChange && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                Alterar Senha
+              </h3>
+              <button
+                onClick={() => setShowPasswordChange(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Senha Atual
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.current ? 'text' : 'password'}
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                    placeholder="Digite sua senha atual"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  >
+                    {showPasswords.current ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nova Senha
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.new ? 'text' : 'password'}
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                    placeholder="Digite a nova senha (mín. 6 caracteres)"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  >
+                    {showPasswords.new ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirmar Nova Senha
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.confirm ? 'text' : 'password'}
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                    placeholder="Confirme a nova senha"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  >
+                    {showPasswords.confirm ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {passwordError && (
+                <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                  {passwordError}
+                </div>
+              )}
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowPasswordChange(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handlePasswordChange}
+                  disabled={passwordLoading || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                  className="flex-1 px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {passwordLoading ? 'Alterando...' : 'Alterar Senha'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* MFA Setup Modal */}
