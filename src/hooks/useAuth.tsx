@@ -31,70 +31,44 @@ export const useAuth = () => {
   return context;
 };
 
-// Session management constants - 30 minutos
-const IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-const SESSION_KEY = 'supabase_session';
-const LAST_ACTIVITY_KEY = 'supabase_last_activity';
-
-interface SessionData {
-  user: User;
-  profile: Profile;
-  lastActivity: number;
-}
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Force clear any invalid sessions on app start
-  useEffect(() => {
-    const clearInvalidSessions = async () => {
-      console.log('🧹 Limpando sessões inválidas...');
-      
-      // Clear all local storage related to auth
-      clearSession();
-      
-      console.log('✅ Sessões limpas - usuário deve fazer login');
-    };
-    
-    clearInvalidSessions();
-  }, []); // Run only once on mount
-
   // Initialize auth state
   useEffect(() => {
     let mounted = true;
-    let initializationTimeout: NodeJS.Timeout;
 
     const initializeAuth = async () => {
       try {
         console.log('🔄 Inicializando autenticação...');
         
-        // Set a timeout to prevent infinite loading
-        initializationTimeout = setTimeout(() => {
-          if (mounted) {
-            console.log('⏰ Timeout na inicialização - definindo loading como false');
-            setLoading(false);
-          }
-        }, 5000); // 5 seconds timeout
+        // Get current session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Erro ao obter sessão:', error);
+          return;
+        }
 
-        // For security, we always require fresh login
-        // No automatic session restoration
-        console.log('🔒 Política de segurança: Login obrigatório a cada sessão');
-        clearSession();
+        if (session?.user && mounted) {
+          console.log('✅ Sessão encontrada para:', session.user.email);
+          setUser(session.user);
+          await loadUserProfile(session.user.id);
+        } else {
+          console.log('❌ Nenhuma sessão ativa');
+        }
       } catch (error) {
         console.error('Erro na inicialização da autenticação:', error);
-        clearSession();
       } finally {
         if (mounted) {
-          clearTimeout(initializationTimeout);
           setLoading(false);
         }
       }
     };
 
-    // Delay initialization to ensure cleanup is complete
-    setTimeout(initializeAuth, 100);
+    initializeAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -107,17 +81,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.log('🚪 Usuário deslogado');
           setUser(null);
           setProfile(null);
-          clearSession();
         } else if (event === 'SIGNED_IN' && session?.user) {
-          console.log('🔐 Usuário logado via evento:', session.user.email);
-          // O login será tratado pela função signIn, não aqui
+          console.log('🔐 Usuário logado:', session.user.email);
+          setUser(session.user);
+          await loadUserProfile(session.user.id);
         }
       }
     );
 
     return () => {
       mounted = false;
-      clearTimeout(initializationTimeout);
       subscription.unsubscribe();
     };
   }, []);
@@ -125,7 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Load user profile from Supabase
   const loadUserProfile = async (userId: string) => {
     try {
-      console.log('👤 Carregando perfil do usuário do Supabase:', userId);
+      console.log('👤 Carregando perfil do usuário:', userId);
       
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -134,7 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (error) {
-        console.error('Erro ao carregar perfil do Supabase:', error);
+        console.error('Erro ao carregar perfil:', error);
         
         // Se o perfil não existe, criar um novo
         if (error.code === 'PGRST116') {
@@ -150,7 +123,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               });
               console.log('✅ Novo perfil criado:', newProfile);
               setProfile(newProfile);
-              saveSession(user.user, newProfile);
               return;
             } catch (createError) {
               console.error('Erro ao criar perfil:', createError);
@@ -162,115 +134,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (profile) {
-        console.log('✅ Perfil carregado do Supabase:', profile.email, 'Role:', profile.role);
+        console.log('✅ Perfil carregado:', profile.email, 'Role:', profile.role);
         setProfile(profile);
-        
-        // Save session data
-        saveSession({
-          id: userId,
-          email: profile.email,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        } as User, profile);
       }
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
     }
   };
 
-  // Update last activity timestamp
-  const updateLastActivity = () => {
-    const now = Date.now();
-    localStorage.setItem(LAST_ACTIVITY_KEY, now.toString());
-    return now;
-  };
-
-  // Check if session is still valid
-  const isSessionValid = (): boolean => {
-    const lastActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
-    if (!lastActivity) return false;
-    
-    const timeSinceLastActivity = Date.now() - parseInt(lastActivity);
-    return timeSinceLastActivity < IDLE_TIMEOUT;
-  };
-
-  // Save session with current timestamp
-  const saveSession = (userData: User, profileData: Profile) => {
-    const now = updateLastActivity();
-    const sessionData: SessionData = {
-      user: userData,
-      profile: profileData,
-      lastActivity: now
-    };
-    
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
-  };
-
-  // Clear session data
-  const clearSession = () => {
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(LAST_ACTIVITY_KEY);
-  };
-
-  // Auto logout when session expires
-  useEffect(() => {
-    if (!user || !profile) return;
-
-    const checkSessionExpiry = () => {
-      if (!isSessionValid()) {
-        console.log('⏰ Sessão expirou por inatividade');
-        signOut();
-        alert('Sua sessão expirou por inatividade. Faça login novamente.');
-      }
-    };
-
-    // Check every 5 minutes
-    const interval = setInterval(checkSessionExpiry, 5 * 60 * 1000);
-    
-    return () => clearInterval(interval);
-  }, [user, profile]);
-
-  // Track user activity
-  useEffect(() => {
-    if (!user || !profile) return;
-
-    const handleUserActivity = () => {
-      if (user && profile && isSessionValid()) {
-        saveSession(user, profile);
-      }
-    };
-
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    
-    let throttleTimeout: NodeJS.Timeout | null = null;
-    const throttledHandler = () => {
-      if (throttleTimeout) return;
-      
-      throttleTimeout = setTimeout(() => {
-        handleUserActivity();
-        throttleTimeout = null;
-      }, 30000); // Update at most once per 30 seconds
-    };
-
-    events.forEach(event => {
-      document.addEventListener(event, throttledHandler, true);
-    });
-
-    return () => {
-      events.forEach(event => {
-        document.removeEventListener(event, throttledHandler, true);
-      });
-      if (throttleTimeout) {
-        clearTimeout(throttleTimeout);
-      }
-    };
-  }, [user, profile]);
-
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('🔐 Tentando fazer login no Supabase para:', email);
+      console.log('🔐 Tentando fazer login para:', email);
       
-      // Fazer login no Supabase diretamente
       const { data, error } = await auth.signIn(email, password);
       
       if (error) {
@@ -285,10 +160,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       if (data.user) {
-        console.log('✅ Login bem-sucedido no Supabase para:', email);
+        console.log('✅ Login bem-sucedido para:', email);
         setUser(data.user);
         await loadUserProfile(data.user.id);
-        console.log('✅ Usuário e perfil carregados com sucesso do Supabase');
       }
     } catch (error: any) {
       console.error('Erro no login:', error);
@@ -328,7 +202,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await auth.signOut();
     setUser(null);
     setProfile(null);
-    clearSession();
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
@@ -344,8 +217,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
 
     setProfile(updatedProfile);
-    saveSession(user, updatedProfile);
-    
     return updatedProfile;
   };
 

@@ -24,10 +24,6 @@ const DebugInfo: React.FC = () => {
       created_at: profile.created_at,
     } : null,
     loading,
-    localStorage: {
-      session: !!localStorage.getItem('supabase_session'),
-      lastActivity: localStorage.getItem('supabase_last_activity'),
-    },
     timestamp: new Date().toISOString(),
   };
 
@@ -70,12 +66,11 @@ const DebugInfo: React.FC = () => {
             
             <button
               onClick={() => {
-                localStorage.clear();
                 window.location.reload();
               }}
               className="w-full text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200"
             >
-              Clear Storage & Reload
+              Reload Page
             </button>
           </div>
         </div>

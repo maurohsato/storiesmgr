@@ -8,7 +8,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false
+  }
+});
 
 // Auth helpers
 export const auth = {
@@ -95,6 +101,17 @@ export const db = {
       .from('profiles')
       .update(updates)
       .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  createProfile: async (profile: Database['public']['Tables']['profiles']['Insert']) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert(profile)
       .select()
       .single();
     
