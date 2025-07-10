@@ -18,6 +18,9 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
 }) => {
   const { profile, loading } = useAuth();
 
+  // Debug: log do estado atual
+  console.log('AuthGuard - Profile:', profile?.email, 'Role:', profile?.role, 'Required:', requiredRoles);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-64">

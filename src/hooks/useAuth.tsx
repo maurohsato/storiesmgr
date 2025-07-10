@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase, auth } from '../lib/supabase';
+import { supabase, auth, db } from '../lib/supabase';
 import { Database } from '../types/database';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -125,7 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Load user profile from Supabase
   const loadUserProfile = async (userId: string) => {
     try {
-      console.log('👤 Carregando perfil do usuário:', userId);
+      console.log('👤 Carregando perfil do usuário do Supabase:', userId);
       
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -134,12 +134,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (error) {
-        console.error('Erro ao carregar perfil:', error);
+        console.error('Erro ao carregar perfil do Supabase:', error);
+        
+        // Se o perfil não existe, criar um novo
+        if (error.code === 'PGRST116') {
+          console.log('📝 Perfil não encontrado, criando novo perfil...');
+          const { data: user } = await supabase.auth.getUser();
+          if (user.user) {
+            try {
+              const newProfile = await db.createProfile({
+                id: user.user.id,
+                email: user.user.email!,
+                full_name: user.user.user_metadata?.full_name || '',
+                role: user.user.email === 'admin@demo.com' ? 'admin' : 'reader'
+              });
+              console.log('✅ Novo perfil criado:', newProfile);
+              setProfile(newProfile);
+              saveSession(user.user, newProfile);
+              return;
+            } catch (createError) {
+              console.error('Erro ao criar perfil:', createError);
+              return;
+            }
+          }
+        }
         return;
       }
 
       if (profile) {
-        console.log('✅ Perfil carregado:', profile.email, 'Role:', profile.role);
+        console.log('✅ Perfil carregado do Supabase:', profile.email, 'Role:', profile.role);
         setProfile(profile);
         
         // Save session data
@@ -245,7 +268,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('🔐 Tentando fazer login para:', email);
+      console.log('🔐 Tentando fazer login no Supabase para:', email);
       
       // Fazer login no Supabase diretamente
       const { data, error } = await auth.signIn(email, password);
@@ -262,10 +285,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       if (data.user) {
-        console.log('✅ Login bem-sucedido para:', email);
+        console.log('✅ Login bem-sucedido no Supabase para:', email);
         setUser(data.user);
         await loadUserProfile(data.user.id);
-        console.log('✅ Usuário e perfil carregados com sucesso');
+        console.log('✅ Usuário e perfil carregados com sucesso do Supabase');
       }
     } catch (error: any) {
       console.error('Erro no login:', error);

@@ -64,6 +64,17 @@ export const auth = {
     if (error) throw error;
     return data;
   },
+
+  createProfile: async (profile: Database['public']['Tables']['profiles']['Insert']) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert(profile)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
 };
 
 // Database helpers

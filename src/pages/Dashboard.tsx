@@ -2,13 +2,84 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
+import AuthDiagnostic from '../components/AuthDiagnostic';
 import { Users, Building2, FolderOpen, FileText, Plus, TrendingUp } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const { teams, clients, projects, userStories } = useAppContext();
-  const { profile } = useAuth();
+  const { profile, user, canManageUsers, canManageContent } = useAuth();
 
-  console.log('Dashboard - Profile:', profile);
+  console.log('Dashboard - User:', user?.email, 'Profile:', profile?.email, 'Role:', profile?.role);
+  console.log('Dashboard - Permissions:', { 
+    canManageUsers: canManageUsers(), 
+    canManageContent: canManageContent() 
+  });
+
+  // Show diagnostic for admin users
+  if (profile?.role === 'admin') {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold text-gray-900">Dashboard Administrativo</h1>
+          <p className="mt-2 text-sm text-gray-700">
+            Bem-vindo, administrador! Aqui está o diagnóstico do sistema.
+          </p>
+        </div>
+        
+        <AuthDiagnostic />
+        
+        <div className="mt-8">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Ações Rápidas</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Link
+              to="/users"
+              className="relative rounded-lg border-2 border-dashed border-orange-200 p-6 hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
+            >
+              <div className="text-center">
+                <Users className="mx-auto h-8 w-8 text-orange-400" />
+                <span className="mt-2 block text-sm font-medium text-gray-900">
+                  Gerenciar Usuários
+                </span>
+              </div>
+            </Link>
+            <Link
+              to="/teams/new"
+              className="relative rounded-lg border-2 border-dashed border-orange-200 p-6 hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
+            >
+              <div className="text-center">
+                <Plus className="mx-auto h-8 w-8 text-orange-400" />
+                <span className="mt-2 block text-sm font-medium text-gray-900">
+                  Novo Time
+                </span>
+              </div>
+            </Link>
+            <Link
+              to="/clients/new"
+              className="relative rounded-lg border-2 border-dashed border-orange-200 p-6 hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
+            >
+              <div className="text-center">
+                <Plus className="mx-auto h-8 w-8 text-orange-400" />
+                <span className="mt-2 block text-sm font-medium text-gray-900">
+                  Novo Cliente
+                </span>
+              </div>
+            </Link>
+            <Link
+              to="/projects/new"
+              className="relative rounded-lg border-2 border-dashed border-orange-200 p-6 hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
+            >
+              <div className="text-center">
+                <Plus className="mx-auto h-8 w-8 text-orange-400" />
+                <span className="mt-2 block text-sm font-medium text-gray-900">
+                  Novo Projeto
+                </span>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show restricted message for readers
   if (profile?.role === 'reader') {

@@ -33,10 +33,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Validar Supabase', href: '/supabase-validation', icon: Database, requiresAdmin: true },
   ];
 
+  // Filtrar navegação baseado nas permissões reais
   const navigation = [
     ...baseNavigation,
-    ...(canManageContent() ? managementNavigation : []),
-    ...(canManageUsers() ? adminNavigation : []),
+    ...(canManageContent() ? managementNavigation.filter(item => !item.requiresManagement || canManageContent()) : []),
+    ...(canManageUsers() ? adminNavigation.filter(item => !item.requiresAdmin || canManageUsers()) : []),
   ];
 
   const isActive = (path: string) => {
