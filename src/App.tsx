@@ -23,9 +23,19 @@ import DebugInfo from './components/DebugInfo';
 const AuthenticatedApp: React.FC = () => {
   const { user, loading } = useAuth();
   const [authMode, setAuthMode] = React.useState<'login' | 'register'>('login');
+  const [initializationComplete, setInitializationComplete] = React.useState(false);
 
   // Debug: log authentication state
   console.log('AuthenticatedApp - Loading:', loading, 'User:', user?.email);
+
+  // Mark initialization as complete after first render
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitializationComplete(true);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   if (loading) {
     return (
@@ -34,17 +44,33 @@ const AuthenticatedApp: React.FC = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Verificando autenticação...</p>
           <p className="text-xs text-gray-500 mt-2">Aguarde enquanto validamos sua sessão</p>
+          {!initializationComplete && (
+            <p className="text-xs text-gray-400 mt-1">Inicializando sistema...</p>
+          )}
         </div>
       </div>
     );
   }
 
-  if (!user) {
+  if (!user && initializationComplete) {
     console.log('AuthenticatedApp - Nenhum usuário logado, mostrando tela de login');
     return authMode === 'login' ? (
       <LoginForm onToggleMode={() => setAuthMode('register')} />
     ) : (
       <RegisterForm onToggleMode={() => setAuthMode('login')} />
+    );
+  }
+
+  // Show loading if user exists but initialization is not complete
+  if (user && !initializationComplete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando aplicação...</p>
+          <p className="text-xs text-gray-500 mt-2">Preparando interface do usuário</p>
+        </div>
+      </div>
     );
   }
 
