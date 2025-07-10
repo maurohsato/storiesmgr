@@ -180,6 +180,18 @@ const UserMenu: React.FC = () => {
                     </p>
                   </div>
                   
+                  {/* Show MFA status for admin */}
+                  {profile.email === 'admin@demo.com' && (
+                    <div className="px-4 py-2 bg-red-50 border-l-4 border-red-400">
+                      <div className="flex items-center">
+                        <Shield className="h-4 w-4 text-red-600 mr-2" />
+                        <p className="text-xs text-red-800 font-medium">
+                          MFA OBRIGATÓRIO para admin
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
                   {!mfaEnabled ? (
                     <button
                       onClick={() => {
@@ -192,7 +204,7 @@ const UserMenu: React.FC = () => {
                       <Shield className="h-4 w-4 mr-3" />
                       Ativar Autenticação 2FA
                     </button>
-                  ) : (
+                  ) : profile.email !== 'admin@demo.com' ? (
                     <button
                       onClick={() => {
                         setIsOpen(false);
@@ -203,6 +215,10 @@ const UserMenu: React.FC = () => {
                       <Shield className="h-4 w-4 mr-3" />
                       Desativar Autenticação 2FA
                     </button>
+                  ) : (
+                    <div className="px-4 py-2 text-xs text-gray-500">
+                      MFA não pode ser desabilitado para admin
+                    </div>
                   )}
                 </div>
                 

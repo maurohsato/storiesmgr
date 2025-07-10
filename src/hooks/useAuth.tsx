@@ -34,8 +34,8 @@ export const useAuth = () => {
   return context;
 };
 
-// Session management constants
-const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+// Session management constants - aumentar timeout para 30 minutos
+const IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
 const SESSION_KEY = 'supabase_session';
 const LAST_ACTIVITY_KEY = 'supabase_last_activity';
 
@@ -54,18 +54,66 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Initialize auth state
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        loadUserProfile(session.user.id);
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        // Check for existing session first
+        const savedSession = localStorage.getItem(SESSION_KEY);
+        if (savedSession) {
+          try {
+            const sessionData: SessionData = JSON.parse(savedSession);
+            
+            // Check if session is still valid
+            if (isSessionValid()) {
+              setUser(sessionData.user);
+              setProfile(sessionData.profile);
+              setMfaEnabled(sessionData.mfaEnabled);
+              updateLastActivity();
+              
+              if (mounted) {
+                setLoading(false);
+              }
+              return;
+            } else {
+              // Session expired, clear it
+              clearSession();
+            }
+          } catch (error) {
+            console.error('Error parsing saved session:', error);
+            clearSession();
+          }
+        }
+
+        // Get session from Supabase
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+        }
+        
+        if (session?.user && mounted) {
+          setUser(session.user);
+          await loadUserProfile(session.user.id);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
-    });
+    };
+
+    initializeAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+
+        console.log('Auth state changed:', event, session?.user?.email);
+        
         if (session?.user) {
           setUser(session.user);
           await loadUserProfile(session.user.id);
@@ -78,13 +126,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Load user profile from Supabase
   const loadUserProfile = async (userId: string) => {
     try {
-      const profile = await auth.getCurrentProfile();
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error loading profile:', error);
+        return;
+      }
+
       if (profile) {
         setProfile(profile);
         // Check if MFA is enabled for this user
@@ -141,7 +202,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Auto logout when session expires due to inactivity
   useEffect(() => {
-    if (!user) return;
+    if (!user || !profile) return;
 
     const checkSessionExpiry = () => {
       if (!isSessionValid()) {
@@ -151,11 +212,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    // Check every 30 seconds
-    const interval = setInterval(checkSessionExpiry, 30000);
+    // Check every 5 minutes instead of 30 seconds
+    const interval = setInterval(checkSessionExpiry, 5 * 60 * 1000);
     
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, profile]);
 
   // Track user activity to extend session
   useEffect(() => {
@@ -176,8 +237,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       'scroll', 
       'touchstart', 
       'click',
-      'focus',
-      'blur'
+      'focus'
     ];
     
     // Add throttling to avoid too frequent updates
@@ -188,7 +248,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throttleTimeout = setTimeout(() => {
         handleUserActivity();
         throttleTimeout = null;
-      }, 1000); // Update at most once per second
+      }, 30000); // Update at most once per 30 seconds
     };
 
     events.forEach(event => {
@@ -207,12 +267,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string, mfaCode?: string) => {
     try {
+      // Check if MFA is required for this user BEFORE attempting login
+      const userMfaEnabled = localStorage.getItem(`supabase_mfa_${email.replace('@', '_').replace('.', '_')}`) === 'true';
+      
+      // For admin@demo.com, MFA is MANDATORY
+      const isMfaMandatory = email === 'admin@demo.com';
+      
+      if ((userMfaEnabled || isMfaMandatory) && !mfaCode) {
+        throw new Error('MFA_REQUIRED');
+      }
+      
+      if ((userMfaEnabled || isMfaMandatory) && mfaCode) {
+        // Validate MFA code format
+        if (!/^\d{6}$/.test(mfaCode)) {
+          throw new Error('Código MFA inválido. Digite 6 dígitos numéricos.');
+        }
+      }
+
       const { data, error } = await auth.signIn(email, password);
       
       if (error) {
         // Provide more specific error messages
         if (error.message?.includes('Invalid login credentials') || error.message?.includes('invalid_credentials')) {
-          throw new Error('Email ou senha incorretos. Verifique suas credenciais ou crie uma nova conta.');
+          throw new Error('Email ou senha incorretos. Verifique suas credenciais.');
         } else if (error.message?.includes('Email not confirmed')) {
           throw new Error('Email não confirmado. Verifique sua caixa de entrada.');
         } else if (error.message?.includes('Too many requests')) {
@@ -222,18 +299,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       if (data.user) {
-        // Check if MFA is enabled for this user
-        const userMfaEnabled = localStorage.getItem(`supabase_mfa_${data.user.id}`) === 'true';
-        
-        if (userMfaEnabled) {
-          if (!mfaCode) {
-            throw new Error('MFA_REQUIRED');
-          }
-          
-          // Para demonstração, aceitar qualquer código de 6 dígitos
-          if (!/^\d{6}$/.test(mfaCode)) {
-            throw new Error('Código MFA inválido. Verifique o código no seu Google Authenticator.');
-          }
+        // For admin@demo.com, automatically enable MFA
+        if (email === 'admin@demo.com') {
+          const mfaKey = `supabase_mfa_${data.user.id}`;
+          localStorage.setItem(mfaKey, 'true');
+          setMfaEnabled(true);
         }
 
         setUser(data.user);
@@ -282,18 +352,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!profile || !user) throw new Error('No user logged in');
     
-    const updatedProfile = await auth.updateProfile(user.id, updates);
+    const { data: updatedProfile, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
     setProfile(updatedProfile);
     
     // Update session with new profile data
     saveSession(user, updatedProfile, mfaEnabled);
+    
+    return updatedProfile;
   };
 
   const enableMFA = async () => {
     if (!user) throw new Error('No user logged in');
     
     // Generate a unique secret for this user
-    const secret = `JBSWY3DPEHPK3PX${user.id.slice(-1).toUpperCase()}`;
+    const secret = `JBSWY3DPEHPK3PX${user.id.slice(-8).toUpperCase()}`;
     const qrCode = `otpauth://totp/UserStories:${user.email}?secret=${secret}&issuer=UserStories`;
     
     return { secret, qrCode };

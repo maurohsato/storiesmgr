@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth.tsx';
-import { LogIn, Eye, EyeOff, Loader2, Shield } from 'lucide-react';
+import { LogIn, Eye, EyeOff, Loader2, Shield, AlertTriangle } from 'lucide-react';
 
 interface LoginFormProps {
   onToggleMode: () => void;
@@ -16,6 +16,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
   const [error, setError] = useState('');
   const [requiresMFA, setRequiresMFA] = useState(false);
 
+  // Check if MFA is mandatory for this email
+  const isMfaMandatory = email === 'admin@demo.com';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -28,7 +31,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
         setRequiresMFA(true);
         setError('');
       } else if (err.message?.includes('Invalid login credentials') || err.message?.includes('invalid_credentials')) {
-        setError('Email ou senha incorretos. Verifique suas credenciais ou crie uma nova conta.');
+        setError('Email ou senha incorretos. Verifique suas credenciais.');
       } else {
         setError(err.message || 'Erro ao fazer login');
       }
@@ -87,6 +90,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                   placeholder="seu@email.com"
                 />
+                {isMfaMandatory && (
+                  <div className="mt-2 flex items-center text-sm text-orange-700 bg-orange-50 p-2 rounded">
+                    <Shield className="h-4 w-4 mr-2" />
+                    <span>MFA obrigatório para este usuário</span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -118,6 +127,29 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
                   </button>
                 </div>
               </div>
+
+              {/* MFA Code field for mandatory MFA users */}
+              {isMfaMandatory && (
+                <div>
+                  <label htmlFor="mfaCode" className="block text-sm font-medium text-gray-700">
+                    Código MFA (Obrigatório)
+                  </label>
+                  <input
+                    id="mfaCode"
+                    name="mfaCode"
+                    type="text"
+                    required={isMfaMandatory}
+                    maxLength={6}
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-orange-500 focus:border-orange-500 text-center text-lg tracking-widest"
+                    placeholder="000000"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Para demonstração, use qualquer código de 6 dígitos (ex: 123456)
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -144,7 +176,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
                   placeholder="000000"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Digite o código de 6 dígitos do seu aplicativo autenticador
+                  Para demonstração, use qualquer código de 6 dígitos (ex: 123456)
                 </p>
               </div>
               
@@ -161,7 +193,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (isMfaMandatory && !requiresMFA && mfaCode.length !== 6)}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? (
@@ -198,20 +230,21 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
               <p>• Autenticação em tempo real</p>
               <p>• Dados salvos no banco PostgreSQL</p>
               <p>• Row Level Security (RLS) ativo</p>
-              <p>• Sessões com timeout de 5 minutos</p>
+              <p>• Sessões com timeout de 30 minutos</p>
               <p>• <strong>admin@demo.com</strong> tem acesso total</p>
             </div>
-            <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
-              <p className="text-xs text-blue-800">
-                <strong>🔐 MFA Disponível:</strong> Configure autenticação de dois fatores 
-                no menu do usuário após fazer login.
-              </p>
+            <div className="mt-3 p-2 bg-red-50 rounded border border-red-200">
+              <div className="flex items-center">
+                <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />
+                <p className="text-xs text-red-800">
+                  <strong>🔐 MFA OBRIGATÓRIO:</strong> admin@demo.com deve usar autenticação de dois fatores.
+                </p>
+              </div>
             </div>
             <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
               <p className="text-xs text-yellow-800">
                 <strong>👤 Controle de Acesso:</strong> Novos usuários são criados com acesso restrito. 
-                Apenas <strong>admin@demo.com</strong> pode conceder permissões. Usuários aguardam aprovação 
-                do administrador para acessar funcionalidades.
+                Apenas <strong>admin@demo.com</strong> pode conceder permissões.
               </p>
             </div>
           </div>
