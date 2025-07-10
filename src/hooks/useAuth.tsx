@@ -60,14 +60,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const clearInvalidSessions = async () => {
       console.log('🧹 Limpando sessões inválidas...');
       
-      // Check if a session exists before attempting to sign out
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // Only sign out if a session actually exists
-      if (session) {
-        await supabase.auth.signOut();
-      }
-      
       // Clear all local storage related to auth
       clearSession();
       
