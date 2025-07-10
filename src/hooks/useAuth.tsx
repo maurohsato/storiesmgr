@@ -35,6 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   // Load user profile from Supabase
   const loadUserProfile = async (userId: string): Promise<Profile | null> => {
@@ -53,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Se o perfil não existe, aguardar um pouco e tentar novamente
         if (error.code === 'PGRST116') {
           console.log('📝 Perfil não encontrado, aguardando criação automática...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
           const { data: retryProfile, error: retryError } = await supabase
             .from('profiles')
@@ -89,18 +90,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Initialize auth state
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     const initializeAuth = async () => {
       try {
         console.log('🔄 Inicializando autenticação...');
         
-        // Check for existing session first
+        // Set timeout to prevent infinite loading
+        timeoutId = setTimeout(() => {
+          if (mounted && !initialized) {
+            console.log('⏰ Timeout na inicialização - definindo loading como false');
+            setLoading(false);
+            setInitialized(true);
+          }
+        }, 10000); // 10 seconds timeout
+        
+        // Check for existing session
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Erro ao verificar sessão:', error);
           if (mounted) {
             setLoading(false);
+            setInitialized(true);
           }
           return;
         }
@@ -119,11 +131,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (mounted) {
           setLoading(false);
+          setInitialized(true);
+          clearTimeout(timeoutId);
         }
       } catch (error) {
         console.error('Erro na inicialização da autenticação:', error);
         if (mounted) {
           setLoading(false);
+          setInitialized(true);
+          clearTimeout(timeoutId);
         }
       }
     };
@@ -151,7 +167,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         
-        if (mounted) {
+        if (mounted && initialized) {
           setLoading(false);
         }
       }
@@ -159,6 +175,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
