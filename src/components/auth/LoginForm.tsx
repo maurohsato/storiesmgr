@@ -162,15 +162,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
         {/* System status info */}
         <div className="mt-8 p-4 bg-green-50 rounded-lg border border-green-200">
           <h3 className="text-sm font-medium text-green-900 mb-2">
-            🔒 Sistema de Segurança Ativo
+            ✅ Sistema Funcionando
           </h3>
           <div className="text-xs text-green-800 space-y-1">
-            <p><strong>• POLÍTICA DE SEGURANÇA:</strong></p>
-            <p>• 🔐 Login obrigatório a cada acesso</p>
-            <p>• 🚫 Sessões não são mantidas entre visitas</p>
+            <p><strong>• SISTEMA OTIMIZADO:</strong></p>
+            <p>• 🔐 Login com sessão persistente</p>
+            <p>• ⚡ Carregamento rápido</p>
             <p>• ✅ Autenticação simplificada com email/senha</p>
             <p>• Dados protegidos com Row Level Security</p>
-            <p>• 🛡️ Máxima segurança para dados sensíveis</p>
+            <p>• 🚪 Botão de logout disponível no menu do usuário</p>
           </div>
         </div>
       </div>

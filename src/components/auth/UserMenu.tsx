@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth.tsx';
 import { User, LogOut, Settings, ChevronDown, Key, Eye, EyeOff, X } from 'lucide-react';
 
 const UserMenu: React.FC = () => {
   const { profile, signOut, changePassword } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   
   // Password change states
@@ -20,6 +21,17 @@ const UserMenu: React.FC = () => {
   });
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+
+  // Detect mobile view
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   if (!profile) return null;
 
@@ -76,6 +88,167 @@ const UserMenu: React.FC = () => {
     }
   };
 
+  // Mobile version
+  if (isMobile) {
+    return (
+      <div className="px-4 py-3">
+        <div className="flex items-center">
+          <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
+            <User className="h-5 w-5 text-orange-600" />
+          </div>
+          <div className="ml-3 flex-1">
+            <div className="text-base font-medium text-gray-800">
+              {profile.full_name || profile.email}
+            </div>
+            <div className="text-sm text-gray-500">
+              {getRoleLabel(profile.role)}
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-3 space-y-1">
+          <button
+            onClick={() => setShowPasswordChange(true)}
+            className="block w-full text-left px-3 py-2 text-base text-gray-700 hover:bg-gray-100 rounded-md"
+          >
+            <Key className="h-4 w-4 mr-3 inline" />
+            Alterar Senha
+          </button>
+          
+          <button
+            onClick={handleSignOut}
+            className="block w-full text-left px-3 py-2 text-base text-red-700 hover:bg-red-50 rounded-md"
+          >
+            <LogOut className="h-4 w-4 mr-3 inline" />
+            Sair
+          </button>
+        </div>
+        
+        {/* Password Change Modal */}
+        {showPasswordChange && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Alterar Senha
+                </h3>
+                <button
+                  onClick={() => setShowPasswordChange(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Senha Atual
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPasswords.current ? 'text' : 'password'}
+                      value={passwordData.currentPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                      placeholder="Digite sua senha atual"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      {showPasswords.current ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nova Senha
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPasswords.new ? 'text' : 'password'}
+                      value={passwordData.newPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                      placeholder="Digite a nova senha (mín. 6 caracteres)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      {showPasswords.new ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Confirmar Nova Senha
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPasswords.confirm ? 'text' : 'password'}
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                      placeholder="Confirme a nova senha"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      {showPasswords.confirm ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {passwordError && (
+                  <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                    {passwordError}
+                  </div>
+                )}
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowPasswordChange(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handlePasswordChange}
+                    disabled={passwordLoading || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                    className="flex-1 px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {passwordLoading ? 'Alterando...' : 'Alterar Senha'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop version
   return (
     <div className="relative">
       <button
@@ -104,7 +277,7 @@ const UserMenu: React.FC = () => {
             className="fixed inset-0 z-10" 
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-20 max-h-96 overflow-y-auto">
+          <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-20">
             <div className="py-1">
               {/* User Info */}
               <div className="px-4 py-3 border-b border-gray-100">
@@ -126,6 +299,9 @@ const UserMenu: React.FC = () => {
                     </div>
                     <div className="mt-1 text-xs text-gray-500">
                       Logado desde: {new Date().toLocaleTimeString('pt-BR')}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      Sessão ativa - clique em "Sair" para fazer logout
                     </div>
                   </div>
                 </div>
