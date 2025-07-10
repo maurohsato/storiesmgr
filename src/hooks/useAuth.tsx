@@ -35,19 +35,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
-
-  // Clear any existing session on app start for security
-  useEffect(() => {
-    const clearSession = async () => {
-      console.log('🧹 Limpando sessão existente para segurança...');
-      await supabase.auth.signOut();
-      setUser(null);
-      setProfile(null);
-    };
-    
-    clearSession();
-  }, []); // Run only once on mount
 
   // Load user profile from Supabase
   const loadUserProfile = async (userId: string): Promise<Profile | null> => {
@@ -66,7 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Se o perfil não existe, aguardar um pouco e tentar novamente
         if (error.code === 'PGRST116') {
           console.log('📝 Perfil não encontrado, aguardando criação automática...');
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
           const { data: retryProfile, error: retryError } = await supabase
             .from('profiles')
@@ -102,51 +89,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Initialize auth state
   useEffect(() => {
     let mounted = true;
-    let timeoutId: NodeJS.Timeout;
 
     const initializeAuth = async () => {
       try {
         console.log('🔄 Inicializando autenticação...');
         
-        // Set timeout to prevent infinite loading
-        timeoutId = setTimeout(() => {
-          if (mounted && !initialized) {
-            console.log('⏰ Timeout na inicialização - finalizando loading');
-            setLoading(false);
-            setInitialized(true);
-          }
-        }, 8000);
-
-        // For security, we require fresh login every time
-        // Clear any existing session first
-        await supabase.auth.signOut();
+        // Check for existing session first
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        console.log('🔒 Política de segurança: Login obrigatório a cada sessão');
+        if (error) {
+          console.error('Erro ao verificar sessão:', error);
+          if (mounted) {
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (session?.user) {
+          console.log('🔐 Sessão existente encontrada para:', session.user.email);
+          setUser(session.user);
+          
+          const userProfile = await loadUserProfile(session.user.id);
+          if (mounted) {
+            setProfile(userProfile);
+          }
+        } else {
+          console.log('🚪 Nenhuma sessão ativa encontrada');
+        }
         
         if (mounted) {
-          setUser(null);
-          setProfile(null);
           setLoading(false);
-          setInitialized(true);
         }
       } catch (error) {
         console.error('Erro na inicialização da autenticação:', error);
         if (mounted) {
-          setUser(null);
-          setProfile(null);
           setLoading(false);
-          setInitialized(true);
-        }
-      } finally {
-        if (mounted) {
-          clearTimeout(timeoutId);
         }
       }
     };
 
-    if (!initialized) {
-      initializeAuth();
-    }
+    initializeAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -168,15 +150,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setProfile(userProfile);
           }
         }
+        
+        if (mounted) {
+          setLoading(false);
+        }
       }
     );
 
     return () => {
       mounted = false;
-      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, [initialized]);
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
