@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Se o perfil não existe, aguardar um pouco e tentar novamente
         if (error.code === 'PGRST116') {
           console.log('📝 Perfil não encontrado, aguardando criação automática...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
           const { data: retryProfile, error: retryError } = await supabase
             .from('profiles')
@@ -64,6 +64,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           
           if (retryError) {
             console.error('Perfil ainda não encontrado após retry:', retryError);
+            
+            // Try to create profile manually as last resort
+            try {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user && user.email) {
+                console.log('🔧 Tentando criar perfil manualmente...');
+                
+                // Determine role based on email
+                let role: Profile['role'] = 'reader';
+                if (user.email === 'admin@demo.com') role = 'admin';
+                else if (user.email === 'manager@demo.com') role = 'project_manager';
+                else if (user.email === 'collab@demo.com') role = 'collaborator';
+                else if (user.email === 'reader@demo.com') role = 'reader';
+                
+                const { data: createdProfile, error: createError } = await supabase
+                  .from('profiles')
+                  .insert({
+                    id: userId,
+                    email: user.email,
+                    full_name: user.user_metadata?.full_name || user.email.split('@')[0],
+                    role: role
+                  })
+                  .select()
+                  .single();
+                
+                if (createError) {
+                  console.error('Erro ao criar perfil manualmente:', createError);
+                  return null;
+                }
+                
+                console.log('✅ Perfil criado manualmente:', createdProfile.email, 'Role:', createdProfile.role);
+                return createdProfile;
+              }
+            } catch (createError) {
+              console.error('Erro na criação manual do perfil:', createError);
+            }
+            
             return null;
           }
           
@@ -203,11 +240,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(data.user);
         
         const userProfile = await loadUserProfile(data.user.id);
-        setProfile(userProfile);
         
         if (!userProfile) {
-          throw new Error('Perfil de usuário não encontrado. Contate o administrador.');
+          console.error('❌ Perfil não encontrado após todas as tentativas');
+          setUser(null);
+          throw new Error('Perfil de usuário não encontrado. Verifique se sua conta foi configurada corretamente ou contate o administrador.');
         }
+        
+        setProfile(userProfile);
+        console.log('✅ Login completo - Usuário e perfil carregados');
       }
     } catch (error: any) {
       console.error('Erro no login:', error);
