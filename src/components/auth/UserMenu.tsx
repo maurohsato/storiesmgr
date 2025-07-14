@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth.tsx';
 import { User, LogOut, Settings, ChevronDown, Key, Eye, EyeOff, X } from 'lucide-react';
 
 const UserMenu: React.FC = () => {
-  const { profile, signOut, changePassword } = useAuth();
+  const { profile, signOut, changePassword, loading } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -33,7 +33,24 @@ const UserMenu: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  if (!profile) return null;
+  // Se ainda está carregando, mostrar indicador
+  if (loading) {
+    return (
+      <div className="flex items-center space-x-2 text-sm text-gray-500">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
+        <span>Carregando...</span>
+      </div>
+    );
+  }
+
+  // Se não tem perfil, não mostrar nada
+  if (!profile) {
+    return (
+      <div className="text-sm text-red-500">
+        Erro: Perfil não carregado
+      </div>
+    );
+  }
 
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
@@ -57,9 +74,12 @@ const UserMenu: React.FC = () => {
 
   const handleSignOut = async () => {
     try {
+      console.log('🚪 Iniciando logout...');
       await signOut();
+      console.log('✅ Logout realizado com sucesso');
     } catch (error) {
       console.error('Error signing out:', error);
+      alert('Erro ao fazer logout. Tente novamente.');
     }
   };
 

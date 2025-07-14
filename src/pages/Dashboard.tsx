@@ -7,13 +7,39 @@ import { Users, Building2, FolderOpen, FileText, Plus, TrendingUp } from 'lucide
 
 const Dashboard: React.FC = () => {
   const { teams, clients, projects, userStories } = useAppContext();
-  const { profile, user, canManageUsers, canManageContent } = useAuth();
+  const { profile, user, canManageUsers, canManageContent, loading } = useAuth();
 
   console.log('Dashboard - User:', user?.email, 'Profile:', profile?.email, 'Role:', profile?.role);
   console.log('Dashboard - Permissions:', { 
     canManageUsers: canManageUsers(), 
     canManageContent: canManageContent() 
   });
+
+  // Se ainda está carregando, mostrar loading
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não tem perfil, mostrar erro
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-8">
+            <h2 className="text-xl font-bold text-red-900 mb-4">Erro no Dashboard</h2>
+            <p className="text-red-700">Perfil de usuário não encontrado. Tente fazer login novamente.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show diagnostic for admin users
   if (profile?.role === 'admin') {
@@ -24,6 +50,9 @@ const Dashboard: React.FC = () => {
           <p className="mt-2 text-sm text-gray-700">
             Bem-vindo, administrador! Aqui está o diagnóstico do sistema.
           </p>
+          <div className="mt-2 text-sm text-green-600">
+            ✅ Usuário: {profile.email} | Role: {profile.role} | Acesso total
+          </div>
         </div>
         
         <AuthDiagnostic />
@@ -75,6 +104,73 @@ const Dashboard: React.FC = () => {
                 </span>
               </div>
             </Link>
+          </div>
+        </div>
+        
+        {/* Stats para admin */}
+        <div className="mt-8">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Estatísticas do Sistema</h2>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <Users className="h-8 w-8 text-orange-400" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Times</dt>
+                      <dd className="text-lg font-medium text-gray-900">{teams.length}</dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <Building2 className="h-8 w-8 text-orange-400" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Clientes</dt>
+                      <dd className="text-lg font-medium text-gray-900">{clients.length}</dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <FolderOpen className="h-8 w-8 text-orange-400" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Projetos</dt>
+                      <dd className="text-lg font-medium text-gray-900">{projects.length}</dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <FileText className="h-8 w-8 text-orange-400" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Histórias</dt>
+                      <dd className="text-lg font-medium text-gray-900">{userStories.length}</dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

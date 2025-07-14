@@ -11,11 +11,12 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
-  const { canManageUsers, canManageContent, profile, user } = useAuth();
+  const { canManageUsers, canManageContent, profile, user, loading } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Debug: log user state
   console.log('Layout - User:', user?.email, 'Profile:', profile?.email, 'Role:', profile?.role);
+  console.log('Layout - Loading:', loading, 'canManageUsers:', canManageUsers(), 'canManageContent:', canManageContent());
 
   const baseNavigation = [
     { name: 'Dashboard', href: '/', icon: Home },
@@ -33,12 +34,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Validar Supabase', href: '/supabase-validation', icon: Database, requiresAdmin: true },
   ];
 
-  // Filtrar navegação baseado nas permissões reais
-  const navigation = [
-    ...baseNavigation,
-    ...(canManageContent() ? managementNavigation.filter(item => !item.requiresManagement || canManageContent()) : []),
-    ...(canManageUsers() ? adminNavigation.filter(item => !item.requiresAdmin || canManageUsers()) : []),
-  ];
+  // Construir navegação baseado no perfil do usuário
+  let navigation = [...baseNavigation];
+  
+  if (profile) {
+    // Para admin: mostrar tudo
+    if (profile.role === 'admin') {
+      navigation = [
+        ...baseNavigation,
+        ...managementNavigation,
+        ...adminNavigation
+      ];
+    }
+    // Para project_manager: mostrar gestão mas não admin
+    else if (profile.role === 'project_manager') {
+      navigation = [
+        ...baseNavigation,
+        ...managementNavigation
+      ];
+    }
+    // Para collaborator e reader: apenas base
+    else {
+      navigation = baseNavigation;
+    }
+  }
 
   const isActive = (path: string) => {
     if (path === '/') {
@@ -46,6 +65,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
     return location.pathname.startsWith(path);
   };
+
+  // Se ainda está carregando, mostrar loading
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-gray-50">
@@ -90,14 +121,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex items-center">
               {/* User Menu - Desktop */}
               <div className="hidden sm:flex sm:items-center">
-                <UserMenu />
+                {user && profile ? (
+                  <UserMenu />
+                ) : (
+                  <div className="text-sm text-gray-500">Carregando usuário...</div>
+                )}
               </div>
               
               {/* Mobile menu button */}
               <div className="sm:hidden flex items-center ml-2">
+                {user && profile && (
+                  <UserMenu />
+                )}
                 <button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                  className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-orange-700 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-orange-500"
+                  className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-orange-700 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-orange-500 ml-2"
                 >
                   {isMobileMenuOpen ? (
                     <X className="block h-6 w-6" />
@@ -112,9 +150,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           {/* Mobile menu */}
           {isMobileMenuOpen && (
             <div className="sm:hidden">
-              <div className="pt-2 pb-3 border-t border-gray-200">
+              {user && profile && (
+                <div className="pt-2 pb-3 border-t border-gray-200">
                 <UserMenu />
               </div>
+              )}
               <div className="border-t border-gray-200">
                 <div className="pt-2 pb-3 space-y-1">
                   {navigation.map((item) => {
